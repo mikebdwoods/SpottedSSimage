@@ -1,0 +1,29 @@
+name: Download Starstyle Images
+
+on:
+  workflow_dispatch:        # run manually
+  schedule:
+    - cron: '0 9 * * *'     # also runs daily at 09:00 UTC
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4 pillow
+
+      - name: Run downloader
+        run: python download_images.py
+
+      - name: Upload images as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: starstyle-images
+          path: starstyle-olivia-images/
