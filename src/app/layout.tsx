@@ -5,10 +5,24 @@ import { Navbar } from "@/components/layout/navbar";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://spotted.co.uk";
+
 export const metadata: Metadata = {
-  title: "Spotted — Celebrity Fashion Finds",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Spotted — Celebrity Fashion Finds",
+    template: "%s | Spotted",
+  },
   description:
     "Discover what your favourite celebrities are wearing — and shop the look for less.",
+  openGraph: {
+    siteName: "Spotted",
+    locale: "en_GB",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({

@@ -1,11 +1,36 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { CommentsSection } from "@/components/comments-section";
 import { Badge } from "@/components/ui/badge";
 
 export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; id: string }>;
+}): Promise<Metadata> {
+  const { slug, id } = await params;
+  const supabase = await createClient();
+  const [{ data: celeb }, { data: photo }] = await Promise.all([
+    supabase.from("celebrities").select("name").eq("slug", slug).single(),
+    supabase.from("photos").select("fallback_image_url").eq("id", id).single(),
+  ]);
+
+  if (!celeb) return { title: "Look | Spotted" };
+
+  return {
+    title: `${celeb.name}'s Look | Spotted`,
+    description: `See what ${celeb.name} is wearing — shop every item in this look.`,
+    openGraph: {
+      title: `${celeb.name}'s Look | Spotted`,
+      images: photo?.fallback_image_url ? [{ url: photo.fallback_image_url }] : [],
+    },
+  };
+}
 
 export default async function PhotoPage({
   params,

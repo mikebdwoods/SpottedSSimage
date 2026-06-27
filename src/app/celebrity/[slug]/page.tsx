@@ -1,10 +1,44 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 
 export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data: celeb } = await supabase
+    .from("celebrities")
+    .select("name, bio, image_url")
+    .eq("slug", slug)
+    .single();
+
+  if (!celeb) return { title: "Celebrity | Spotted" };
+
+  return {
+    title: `${celeb.name} | Spotted`,
+    description:
+      celeb.bio ??
+      `Shop ${celeb.name}'s outfits — find shoppable alternatives to every look.`,
+    openGraph: {
+      title: `${celeb.name} | Spotted`,
+      images: celeb.image_url ? [{ url: celeb.image_url }] : [],
+    },
+  };
+}
+
+export async function generateStaticParams() {
+  const supabase = await createClient();
+  const { data } = await supabase.from("celebrities").select("slug");
+  return (data ?? []).map((c) => ({ slug: c.slug }));
+}
 
 export default async function CelebrityPage({
   params,

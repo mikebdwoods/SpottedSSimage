@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
 
 const STATUS_COLOUR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",

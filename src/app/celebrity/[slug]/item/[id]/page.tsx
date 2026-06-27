@@ -1,12 +1,43 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export const revalidate = 60;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; id: string }>;
+}): Promise<Metadata> {
+  const { slug, id } = await params;
+  const supabase = await createClient();
+  const [{ data: celeb }, { data: item }] = await Promise.all([
+    supabase.from("celebrities").select("name").eq("slug", slug).single(),
+    supabase
+      .from("clothing_items")
+      .select("category, colour, estimated_brand")
+      .eq("id", id)
+      .single(),
+  ]);
+
+  if (!celeb || !item) return { title: "Shop the Look | Spotted" };
+
+  const parts = [item.colour, item.category, item.estimated_brand].filter(Boolean);
+  const desc = parts.length
+    ? `Shop ${celeb.name}'s ${parts.join(" ")} — find budget, mid-range and premium alternatives.`
+    : `Shop ${celeb.name}'s look on Spotted.`;
+
+  return {
+    title: `${celeb.name}'s ${item.category ?? "Item"} | Spotted`,
+    description: desc,
+    openGraph: { title: `${celeb.name}'s ${item.category ?? "Item"} | Spotted` },
+  };
+}
 
 type PriceTier = "premium" | "mid" | "budget";
 
