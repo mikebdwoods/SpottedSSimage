@@ -59,3 +59,53 @@ export async function addCelebrity(formData: FormData) {
   revalidatePath("/admin/celebrities");
   revalidatePath("/");
 }
+
+export async function updateCelebrity(id: string, formData: FormData) {
+  const supabase = await requireAdmin();
+
+  const name = formData.get("name") as string;
+  const bio = formData.get("bio") as string;
+  const gender = formData.get("gender") as string;
+  const imageFile = formData.get("image") as File | null;
+
+  const { data: current } = await supabase
+    .from("celebrities")
+    .select("slug")
+    .eq("id", id)
+    .single();
+
+  const updates: Record<string, string | null> = {
+    name,
+    bio: bio || null,
+    gender: gender || null,
+  };
+
+  if (imageFile && imageFile.size > 0) {
+    const ext = imageFile.name.split(".").pop();
+    const filename = `celebrities/${crypto.randomUUID()}.${ext}`;
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("photos")
+      .upload(filename, imageFile, { contentType: imageFile.type });
+
+    if (!uploadError) {
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("photos").getPublicUrl(uploadData.path);
+      updates.image_url = publicUrl;
+    }
+  }
+
+  await supabase.from("celebrities").update(updates).eq("id", id);
+
+  revalidatePath("/admin/celebrities");
+  revalidatePath(`/admin/celebrities/${id}`);
+  if (current?.slug) revalidatePath(`/celebrity/${current.slug}`);
+  revalidatePath("/");
+}
+
+export async function deleteCelebrity(id: string) {
+  const supabase = await requireAdmin();
+  await supabase.from("celebrities").delete().eq("id", id);
+  revalidatePath("/admin/celebrities");
+  revalidatePath("/");
+}

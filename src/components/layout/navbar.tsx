@@ -30,6 +30,9 @@ export async function Navbar() {
 
           {/* Desktop nav */}
           <nav className="hidden sm:flex items-center gap-2">
+            <Link href="/celebrities">
+              <Button variant="ghost" size="sm">Celebrities</Button>
+            </Link>
             {isAdmin && (
               <Link href="/admin">
                 <Button variant="ghost" size="sm">

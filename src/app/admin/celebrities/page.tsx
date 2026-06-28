@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { AddCelebrityForm } from "@/components/admin/add-celebrity-form";
 
@@ -22,9 +23,10 @@ export default async function AdminCelebritiesPage() {
           ) : (
             <div className="space-y-2">
               {celebrities.map((celeb) => (
-                <div
+                <Link
                   key={celeb.id}
-                  className="flex items-center gap-3 border rounded-lg p-3"
+                  href={`/admin/celebrities/${celeb.id}`}
+                  className="flex items-center gap-3 border rounded-lg p-3 hover:bg-gray-50 transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 shrink-0 relative">
                     {celeb.image_url ? (
@@ -41,11 +43,12 @@ export default async function AdminCelebritiesPage() {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{celeb.name}</p>
                     <p className="text-xs text-muted-foreground">{celeb.slug}</p>
                   </div>
-                </div>
+                  <span className="text-xs text-blue-600 shrink-0">Edit →</span>
+                </Link>
               ))}
             </div>
           )}
