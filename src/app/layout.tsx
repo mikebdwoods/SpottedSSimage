@@ -61,6 +61,7 @@ export default function RootLayout({
                 <nav className="space-y-2">
                   <a href="/" className="block hover:text-foreground transition-colors">Home</a>
                   <a href="/celebrities" className="block hover:text-foreground transition-colors">All Celebrities</a>
+                  <a href="/looks" className="block hover:text-foreground transition-colors">Latest Looks</a>
                   <a href="/search" className="block hover:text-foreground transition-colors">Search</a>
                 </nav>
               </div>

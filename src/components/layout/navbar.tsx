@@ -33,6 +33,9 @@ export async function Navbar() {
             <Link href="/celebrities">
               <Button variant="ghost" size="sm">Celebrities</Button>
             </Link>
+            <Link href="/looks">
+              <Button variant="ghost" size="sm">Looks</Button>
+            </Link>
             <Link href="/search" aria-label="Search">
               <Button variant="ghost" size="sm" className="px-2.5">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -115,10 +115,10 @@ export default async function HomePage() {
                 </p>
               </div>
               <Link
-                href="/celebrities"
+                href="/looks"
                 className="text-sm font-medium hover:underline hidden sm:block"
               >
-                Browse all →
+                View all looks →
               </Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -172,6 +172,14 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
+          </div>
+          <div className="flex justify-center mt-8 sm:hidden">
+            <Link
+              href="/looks"
+              className="text-sm font-medium border rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+            >
+              View all looks →
+            </Link>
           </div>
         </section>
       )}

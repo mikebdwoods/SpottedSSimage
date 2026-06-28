@@ -11,116 +11,170 @@ export const metadata: Metadata = {
     "Browse all celebrities on Spotted — discover their outfits and shop the look for less.",
 };
 
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
 export default async function CelebritiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; letter?: string }>;
 }) {
-  const { q } = await searchParams;
+  const { q, letter } = await searchParams;
   const supabase = await createClient();
 
-  let query = supabase
+  type CelebRow = {
+    id: string;
+    name: string;
+    slug: string;
+    image_url: string | null;
+    bio: string | null;
+    photo_count: number;
+  };
+
+  let dbQuery = supabase
     .from("celebrities")
-    .select("id, name, slug, image_url, bio")
+    .select(
+      "id, name, slug, image_url, bio, photos(count)"
+    )
     .order("name", { ascending: true });
 
   if (q) {
-    query = query.ilike("name", `%${q}%`);
+    dbQuery = dbQuery.ilike("name", `%${q}%`);
+  } else if (letter) {
+    dbQuery = dbQuery.ilike("name", `${letter}%`);
   }
 
-  const { data: celebrities } = await query;
+  const { data: raw } = await dbQuery;
+
+  const celebrities: CelebRow[] = (raw ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    slug: c.slug,
+    image_url: c.image_url,
+    bio: c.bio,
+    photo_count:
+      Array.isArray(c.photos) && c.photos.length > 0
+        ? (c.photos[0] as { count: number }).count
+        : 0,
+  }));
+
+  const activeLetter = letter?.toUpperCase();
+  const isFiltered = !!(q || activeLetter);
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-10">
-          <h1 className="text-4xl font-black tracking-tight mb-2">
-            All Celebrities
-          </h1>
-          <p className="text-muted-foreground">
-            {celebrities?.length ?? 0} celebrities · click to browse their looks
-          </p>
-        </div>
-
-        {/* Search */}
-        <form method="get" className="mb-8 max-w-sm">
-          <div className="relative">
+    <div className="min-h-screen">
+      {/* Header */}
+      <div className="bg-gray-50 border-b py-10 px-4">
+        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight mb-1">
+              {activeLetter ? `Celebrities — ${activeLetter}` : "All Celebrities"}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              {isFiltered
+                ? `${celebrities.length} result${celebrities.length === 1 ? "" : "s"}`
+                : `${celebrities.length} celebrities · click to browse their looks`}
+            </p>
+          </div>
+          {/* Search */}
+          <form method="get" className="flex gap-2 max-w-xs w-full sm:w-auto">
             <input
               name="q"
               type="search"
               defaultValue={q ?? ""}
               placeholder="Search celebrities..."
-              className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black pr-10"
+              className="flex-1 border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black bg-white"
             />
             <button
               type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shrink-0"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
-              </svg>
+              Go
             </button>
-          </div>
-        </form>
-
-        {!celebrities || celebrities.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
-            <p className="text-lg font-medium mb-2">No celebrities found</p>
-            {q && (
-              <p className="text-sm">
-                No results for &quot;{q}&quot;.{" "}
-                <Link href="/celebrities" className="underline">
-                  Clear search
-                </Link>
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
-            {celebrities.map((celeb) => (
-              <Link
-                key={celeb.id}
-                href={`/celebrity/${celeb.slug}`}
-                className="group flex flex-col items-center text-center"
-              >
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-200 mb-3 ring-2 ring-transparent group-hover:ring-black transition-all duration-200">
-                  {celeb.image_url ? (
-                    <Image
-                      src={celeb.image_url}
-                      alt={celeb.name}
-                      fill
-                      className="object-cover group-hover:scale-110 transition-transform duration-300"
-                      sizes="96px"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-400">
-                      {celeb.name.charAt(0)}
-                    </div>
-                  )}
-                </div>
-                <p className="text-sm font-semibold leading-tight">{celeb.name}</p>
-                {celeb.bio && (
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 max-w-[120px]">
-                    {celeb.bio}
-                  </p>
-                )}
-              </Link>
-            ))}
-          </div>
-        )}
+          </form>
+        </div>
       </div>
+
+      {/* A-Z filter */}
+      {!q && (
+        <div className="border-b bg-white sticky top-16 z-20">
+          <div className="mx-auto max-w-7xl px-4">
+            <div className="flex gap-0.5 overflow-x-auto py-2 scrollbar-hide">
+              <Link
+                href="/celebrities"
+                className={`shrink-0 w-8 h-8 flex items-center justify-center rounded text-xs font-semibold transition-colors ${
+                  !activeLetter ? "bg-black text-white" : "hover:bg-gray-100 text-muted-foreground"
+                }`}
+              >
+                All
+              </Link>
+              {LETTERS.map((l) => (
+                <Link
+                  key={l}
+                  href={`/celebrities?letter=${l}`}
+                  className={`shrink-0 w-8 h-8 flex items-center justify-center rounded text-xs font-semibold transition-colors ${
+                    activeLetter === l
+                      ? "bg-black text-white"
+                      : "hover:bg-gray-100 text-muted-foreground"
+                  }`}
+                >
+                  {l}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Celebrities grid */}
+      <section className="py-10 px-4">
+        <div className="mx-auto max-w-7xl">
+          {celebrities.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <p className="text-lg font-semibold mb-2">No celebrities found</p>
+              {(q || activeLetter) && (
+                <Link
+                  href="/celebrities"
+                  className="text-sm underline font-medium"
+                >
+                  Clear filter
+                </Link>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
+              {celebrities.map((celeb) => (
+                <Link
+                  key={celeb.id}
+                  href={`/celebrity/${celeb.slug}`}
+                  className="group flex flex-col items-center text-center"
+                >
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-200 mb-3 ring-2 ring-transparent group-hover:ring-black transition-all duration-200">
+                    {celeb.image_url ? (
+                      <Image
+                        src={celeb.image_url}
+                        alt={celeb.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        sizes="96px"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-400">
+                        {celeb.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm font-semibold leading-tight">{celeb.name}</p>
+                  {celeb.photo_count > 0 && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {celeb.photo_count} look{celeb.photo_count === 1 ? "" : "s"}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
