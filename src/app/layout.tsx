@@ -20,9 +20,17 @@ export const metadata: Metadata = {
     siteName: "Spotted",
     locale: "en_GB",
     type: "website",
+    images: [
+      {
+        url: `${siteUrl}/api/og?title=Spotted&subtitle=UK Celebrity Fashion Finds`,
+        width: 1200,
+        height: 630,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
+    images: [`${siteUrl}/api/og?title=Spotted&subtitle=UK Celebrity Fashion Finds`],
   },
 };
 
@@ -36,18 +44,59 @@ export default function RootLayout({
       <body className={inter.className}>
         <Navbar />
         <main>{children}</main>
-        <footer className="border-t py-10 px-4 text-sm text-muted-foreground">
-          <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="font-bold text-foreground">Spotted</p>
-            <nav className="flex flex-wrap justify-center gap-5">
-              <a href="/" className="hover:underline">Home</a>
-              <a href="/celebrities" className="hover:underline">Celebrities</a>
-              <a href="/about" className="hover:underline">About</a>
-              <a href="/contact" className="hover:underline">Contact</a>
-              <a href="/privacy" className="hover:underline">Privacy</a>
-              <a href="/terms" className="hover:underline">Terms</a>
-            </nav>
-            <p>© {new Date().getFullYear()} Spotted. UK Celebrity Fashion.</p>
+        <footer className="border-t bg-gray-50 py-14 px-4 text-sm text-muted-foreground">
+          <div className="mx-auto max-w-7xl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
+              {/* Brand */}
+              <div className="col-span-2 sm:col-span-1">
+                <p className="font-black text-xl text-foreground mb-2">Spotted</p>
+                <p className="text-xs leading-relaxed">
+                  Discover what your favourite UK celebrities are wearing — and shop
+                  the look for less.
+                </p>
+              </div>
+              {/* Discover */}
+              <div>
+                <p className="font-semibold text-foreground mb-3 text-xs uppercase tracking-wider">Discover</p>
+                <nav className="space-y-2">
+                  <a href="/" className="block hover:text-foreground transition-colors">Home</a>
+                  <a href="/celebrities" className="block hover:text-foreground transition-colors">All Celebrities</a>
+                  <a href="/search" className="block hover:text-foreground transition-colors">Search</a>
+                </nav>
+              </div>
+              {/* Company */}
+              <div>
+                <p className="font-semibold text-foreground mb-3 text-xs uppercase tracking-wider">Company</p>
+                <nav className="space-y-2">
+                  <a href="/about" className="block hover:text-foreground transition-colors">About</a>
+                  <a href="/contact" className="block hover:text-foreground transition-colors">Contact</a>
+                  <a href="/privacy" className="block hover:text-foreground transition-colors">Privacy</a>
+                  <a href="/terms" className="block hover:text-foreground transition-colors">Terms</a>
+                </nav>
+              </div>
+              {/* Newsletter */}
+              <div>
+                <p className="font-semibold text-foreground mb-3 text-xs uppercase tracking-wider">Newsletter</p>
+                <p className="text-xs mb-3 leading-relaxed">
+                  New looks and shopping finds — direct to your inbox.
+                </p>
+                <a
+                  href="/#newsletter"
+                  className="inline-block text-xs bg-black text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition-colors"
+                >
+                  Subscribe
+                </a>
+                <a href="/unsubscribe" className="block text-xs mt-2 hover:text-foreground transition-colors">
+                  Unsubscribe
+                </a>
+              </div>
+            </div>
+            <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs">© {new Date().getFullYear()} Spotted. UK Celebrity Fashion.</p>
+              <p className="text-xs">
+                Some links are affiliate links — we may earn a small commission.
+              </p>
+            </div>
           </div>
         </footer>
         <CookieBanner />
