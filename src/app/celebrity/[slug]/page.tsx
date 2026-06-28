@@ -22,6 +22,13 @@ export async function generateMetadata({
 
   if (!celeb) return { title: "Celebrity | Spotted" };
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://spotted.co.uk";
+  const ogParams = new URLSearchParams({
+    title: celeb.name,
+    subtitle: "Shop the look on Spotted",
+    ...(celeb.image_url ? { image: celeb.image_url } : {}),
+  });
+
   return {
     title: `${celeb.name} | Spotted`,
     description:
@@ -29,7 +36,11 @@ export async function generateMetadata({
       `Shop ${celeb.name}'s outfits — find shoppable alternatives to every look.`,
     openGraph: {
       title: `${celeb.name} | Spotted`,
-      images: celeb.image_url ? [{ url: celeb.image_url }] : [],
+      images: [{ url: `${siteUrl}/api/og?${ogParams}`, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      images: [`${siteUrl}/api/og?${ogParams}`],
     },
   };
 }

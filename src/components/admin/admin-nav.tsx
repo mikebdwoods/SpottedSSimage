@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/admin/upload", label: "Upload" },
   { href: "/admin/celebrities", label: "Celebrities" },
   { href: "/admin/merch", label: "Merch" },
+  { href: "/admin/newsletter", label: "Newsletter" },
 ];
 
 export function AdminNav() {
