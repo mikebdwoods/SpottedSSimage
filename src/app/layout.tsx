@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/navbar";
+import { CookieBanner } from "@/components/cookie-banner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,9 +36,17 @@ export default function RootLayout({
       <body className={inter.className}>
         <Navbar />
         <main>{children}</main>
-        <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} Spotted. UK Celebrity Fashion.</p>
+        <footer className="border-t py-10 px-4 text-sm text-muted-foreground">
+          <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="font-bold text-foreground">Spotted</p>
+            <nav className="flex gap-5">
+              <a href="/" className="hover:underline">Home</a>
+              <a href="/privacy" className="hover:underline">Privacy</a>
+            </nav>
+            <p>© {new Date().getFullYear()} Spotted. UK Celebrity Fashion.</p>
+          </div>
         </footer>
+        <CookieBanner />
       </body>
     </html>
   );

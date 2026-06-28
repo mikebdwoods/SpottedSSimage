@@ -177,6 +177,20 @@ export default async function CelebrityPage({
           </div>
         </section>
       )}
+
+      {/* JSON-LD Person schema */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Person",
+            name: celeb.name,
+            ...(celeb.bio ? { description: celeb.bio } : {}),
+            ...(celeb.image_url ? { image: celeb.image_url } : {}),
+          }),
+        }}
+      />
     </div>
   );
 }

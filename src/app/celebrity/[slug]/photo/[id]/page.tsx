@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { CommentsSection } from "@/components/comments-section";
+import { ShareButton } from "@/components/share-button";
 import { Badge } from "@/components/ui/badge";
 
 export const revalidate = 60;
@@ -74,16 +75,19 @@ export default async function PhotoPage({
   return (
     <div className="min-h-screen py-8 px-4">
       <div className="mx-auto max-w-4xl">
-        {/* Breadcrumb */}
-        <nav className="text-sm text-muted-foreground mb-6">
-          <Link href="/" className="hover:underline">Home</Link>
-          {" / "}
-          <Link href={`/celebrity/${slug}`} className="hover:underline">
-            {celeb.name}
-          </Link>
-          {" / "}
-          <span>Look</span>
-        </nav>
+        {/* Breadcrumb + share */}
+        <div className="flex items-center justify-between mb-6">
+          <nav className="text-sm text-muted-foreground">
+            <Link href="/" className="hover:underline">Home</Link>
+            {" / "}
+            <Link href={`/celebrity/${slug}`} className="hover:underline">
+              {celeb.name}
+            </Link>
+            {" / "}
+            <span>Look</span>
+          </nav>
+          <ShareButton title={`${celeb.name}'s Look on Spotted`} />
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Photo */}

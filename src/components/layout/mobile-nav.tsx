@@ -69,6 +69,14 @@ export function MobileNav({ isAdmin, isSignedIn }: Props) {
           >
             Home
           </Link>
+          {isSignedIn && (
+            <Link
+              href="/account"
+              className="block px-3 py-2.5 rounded-md text-sm hover:bg-gray-50 transition-colors"
+            >
+              My Account
+            </Link>
+          )}
 
           {isAdmin && (
             <>

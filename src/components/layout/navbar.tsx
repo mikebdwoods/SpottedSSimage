@@ -38,16 +38,17 @@ export async function Navbar() {
               </Link>
             )}
             {user ? (
-              <form action="/auth/signout" method="post">
-                <Button variant="ghost" size="sm" type="submit">
-                  Sign out
-                </Button>
-              </form>
+              <>
+                <Link href="/account">
+                  <Button variant="ghost" size="sm">Account</Button>
+                </Link>
+                <form action="/auth/signout" method="post">
+                  <Button variant="ghost" size="sm" type="submit">Sign out</Button>
+                </form>
+              </>
             ) : (
               <Link href="/auth/login">
-                <Button variant="ghost" size="sm">
-                  Sign in
-                </Button>
+                <Button variant="ghost" size="sm">Sign in</Button>
               </Link>
             )}
           </nav>

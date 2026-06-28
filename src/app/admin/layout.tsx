@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { AdminNav } from "@/components/admin/admin-nav";
 
 async function checkAdmin() {
   const supabase = await createClient();
@@ -34,23 +35,7 @@ export default async function AdminLayout({
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-4">
           Admin
         </p>
-        <nav className="space-y-1">
-          {[
-            { href: "/admin", label: "Dashboard" },
-            { href: "/admin/photos", label: "Photos" },
-            { href: "/admin/upload", label: "Upload" },
-            { href: "/admin/celebrities", label: "Celebrities" },
-            { href: "/admin/merch", label: "Merch" },
-          ].map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="block px-3 py-2 text-sm rounded-md hover:bg-gray-200 transition-colors"
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+        <AdminNav />
       </aside>
 
       {/* Main content */}

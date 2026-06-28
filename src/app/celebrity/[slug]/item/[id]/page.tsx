@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ShoppingBag, ExternalLink, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { ShareButton } from "@/components/share-button";
 import { formatPrice } from "@/lib/utils";
 
 export const revalidate = 60;
@@ -78,11 +79,21 @@ export default async function ClothingItemPage({
 
   if (!item || !celeb) notFound();
 
-  const { data: productMatches } = await supabase
-    .from("product_matches")
-    .select("*")
-    .eq("clothing_item_id", id)
-    .order("sort_order", { ascending: true });
+  const [{ data: productMatches }, { data: moreLooks }] = await Promise.all([
+    supabase
+      .from("product_matches")
+      .select("*")
+      .eq("clothing_item_id", id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("photos")
+      .select("id, fallback_image_url")
+      .eq("celebrity_id", celeb.id)
+      .eq("published", true)
+      .neq("id", item.photo_id)
+      .order("created_at", { ascending: false })
+      .limit(4),
+  ]);
 
   const matchesByTier = TIER_ORDER.reduce<
     Record<PriceTier, typeof productMatches>
@@ -109,9 +120,12 @@ export default async function ClothingItemPage({
             <ArrowLeft className="h-4 w-4" />
             Back to look
           </Link>
-          <p className="text-sm font-medium text-muted-foreground hidden sm:block">
-            {totalMatches} {totalMatches === 1 ? "match" : "matches"} found
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-medium text-muted-foreground hidden sm:block">
+              {totalMatches} {totalMatches === 1 ? "match" : "matches"}
+            </p>
+            <ShareButton title={`${celeb.name}'s ${item.category ?? "look"} on Spotted`} />
+          </div>
         </div>
       </div>
 
@@ -244,6 +258,81 @@ export default async function ClothingItemPage({
           )}
         </div>
       </div>
+
+      {/* More from this celebrity */}
+      {moreLooks && moreLooks.length > 0 && (
+        <section className="py-12 px-4 bg-gray-50 border-t">
+          <div className="mx-auto max-w-5xl">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold">More from {celeb.name}</h2>
+              <Link
+                href={`/celebrity/${slug}`}
+                className="text-sm text-muted-foreground hover:underline"
+              >
+                See all →
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {moreLooks.map((look) => (
+                <Link
+                  key={look.id}
+                  href={`/celebrity/${slug}/photo/${look.id}`}
+                  className="group"
+                >
+                  <div className="aspect-[3/4] relative overflow-hidden rounded-lg bg-gray-200">
+                    {look.fallback_image_url ? (
+                      <Image
+                        src={look.fallback_image_url}
+                        alt={`${celeb.name} look`}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 640px) 50vw, 25vw"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                        No image
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* JSON-LD structured data */}
+      {productMatches && productMatches.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "ItemList",
+              name: `${celeb.name}'s ${item.category ?? "item"} — shop the look`,
+              numberOfItems: productMatches.length,
+              itemListElement: productMatches.map((match, i) => ({
+                "@type": "ListItem",
+                position: i + 1,
+                item: {
+                  "@type": "Product",
+                  name: match.product_name,
+                  offers: {
+                    "@type": "Offer",
+                    url: match.affiliate_url || match.product_url,
+                    priceCurrency: "GBP",
+                    ...(match.price_gbp
+                      ? { price: match.price_gbp.toFixed(2) }
+                      : {}),
+                    seller: { "@type": "Organization", name: match.retailer_name },
+                  },
+                  ...(match.image_url ? { image: match.image_url } : {}),
+                },
+              })),
+            }),
+          }}
+        />
+      )}
     </div>
   );
 }
