@@ -82,6 +82,12 @@ export function MobileNav({ isAdmin, isSignedIn }: Props) {
             Looks
           </Link>
           <Link
+            href="/trending"
+            className="block px-3 py-2.5 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Trending
+          </Link>
+          <Link
             href="/search"
             className="block px-3 py-2.5 rounded-md text-sm hover:bg-gray-50 transition-colors"
           >
