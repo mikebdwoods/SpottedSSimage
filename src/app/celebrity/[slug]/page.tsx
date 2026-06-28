@@ -35,9 +35,24 @@ export async function generateMetadata({
 }
 
 export async function generateStaticParams() {
-  const supabase = await createClient();
-  const { data } = await supabase.from("celebrities").select("slug");
-  return (data ?? []).map((c) => ({ slug: c.slug }));
+  // Use a plain fetch — createClient() uses cookies() which is unavailable at build time
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return [];
+
+  try {
+    const res = await fetch(`${url}/rest/v1/celebrities?select=slug`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+      },
+    });
+    if (!res.ok) return [];
+    const data: { slug: string }[] = await res.json();
+    return data.map((c) => ({ slug: c.slug }));
+  } catch {
+    return [];
+  }
 }
 
 export default async function CelebrityPage({
