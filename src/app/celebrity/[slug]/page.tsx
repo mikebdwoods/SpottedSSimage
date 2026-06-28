@@ -82,50 +82,86 @@ export default async function CelebrityPage({
 
   if (!celeb) notFound();
 
-  const [{ data: celebPhotos }, { data: celebMerch }] = await Promise.all([
-    supabase
-      .from("photos")
-      .select("id, fallback_image_url, created_at")
-      .eq("celebrity_id", celeb.id)
-      .eq("published", true)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("merch_products")
-      .select("*")
-      .eq("celebrity_id", celeb.id),
-  ]);
+  const [{ data: celebPhotos }, { data: celebMerch }, { data: relatedCelebs }] =
+    await Promise.all([
+      supabase
+        .from("photos")
+        .select("id, fallback_image_url, created_at")
+        .eq("celebrity_id", celeb.id)
+        .eq("published", true)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("merch_products")
+        .select("*")
+        .eq("celebrity_id", celeb.id),
+      supabase
+        .from("celebrities")
+        .select("id, name, slug, image_url")
+        .neq("id", celeb.id)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
+
+  const lookCount = celebPhotos?.length ?? 0;
 
   return (
     <div className="min-h-screen">
       {/* Celebrity Header */}
-      <div className="bg-gray-50 py-12 px-4">
-        <div className="mx-auto max-w-4xl flex flex-col sm:flex-row gap-8 items-center sm:items-start">
-          <div className="relative w-32 h-32 sm:w-40 sm:h-40 shrink-0">
+      <div className="relative bg-black text-white overflow-hidden">
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
+            backgroundSize: "32px 32px",
+          }}
+        />
+        <div className="relative mx-auto max-w-4xl px-4 py-14 flex flex-col sm:flex-row gap-8 items-center sm:items-start">
+          <div className="relative w-28 h-28 sm:w-36 sm:h-36 shrink-0">
             {celeb.image_url ? (
               <Image
                 src={celeb.image_url}
                 alt={celeb.name}
                 fill
-                className="object-cover rounded-full"
-                sizes="160px"
+                className="object-cover rounded-full ring-4 ring-white/10"
+                sizes="144px"
               />
             ) : (
-              <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-4xl font-bold text-gray-400">
+              <div className="w-full h-full rounded-full bg-gray-700 ring-4 ring-white/10 flex items-center justify-center text-4xl font-bold text-gray-400">
                 {celeb.name.charAt(0)}
               </div>
             )}
           </div>
-          <div>
-            <h1 className="text-3xl font-bold mb-3">{celeb.name}</h1>
+          <div className="text-center sm:text-left">
+            <p className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase mb-2">
+              Celebrity
+            </p>
+            <h1 className="text-4xl font-black tracking-tight mb-3">{celeb.name}</h1>
             {celeb.bio && (
-              <p className="text-muted-foreground max-w-lg">{celeb.bio}</p>
+              <p className="text-gray-300 max-w-lg text-sm leading-relaxed mb-4">
+                {celeb.bio}
+              </p>
             )}
+            <div className="flex items-center gap-4 justify-center sm:justify-start">
+              <span className="text-sm text-gray-400">
+                <span className="font-semibold text-white">{lookCount}</span>{" "}
+                look{lookCount === 1 ? "" : "s"}
+              </span>
+              {lookCount > 0 && (
+                <a
+                  href="#looks"
+                  className="text-xs font-semibold bg-white text-black px-4 py-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  Browse looks
+                </a>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Photos Grid */}
-      <section className="py-12 px-4">
+      <section id="looks" className="py-12 px-4">
         <div className="mx-auto max-w-7xl">
           <h2 className="text-xl font-semibold mb-6">Looks</h2>
           {!celebPhotos || celebPhotos.length === 0 ? (
@@ -198,6 +234,43 @@ export default async function CelebrityPage({
                     </p>
                   )}
                 </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Related celebrities */}
+      {relatedCelebs && relatedCelebs.length > 0 && (
+        <section className="py-12 px-4 border-t">
+          <div className="mx-auto max-w-7xl">
+            <h2 className="text-lg font-bold mb-5">More celebrities</h2>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+              {relatedCelebs.map((rc) => (
+                <Link
+                  key={rc.id}
+                  href={`/celebrity/${rc.slug}`}
+                  className="group flex flex-col items-center text-center"
+                >
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-gray-200 mb-1.5 ring-2 ring-transparent group-hover:ring-black transition-all duration-200 relative">
+                    {rc.image_url ? (
+                      <Image
+                        src={rc.image_url}
+                        alt={rc.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        sizes="64px"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-base font-bold text-gray-400">
+                        {rc.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs font-medium leading-tight line-clamp-2">
+                    {rc.name}
+                  </p>
+                </Link>
               ))}
             </div>
           </div>

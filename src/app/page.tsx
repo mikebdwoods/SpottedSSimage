@@ -103,6 +103,34 @@ export default async function HomePage() {
         </div>
       )}
 
+      {/* ── Category Shortcuts ───────────────────────────────── */}
+      <section className="py-6 px-4 border-b bg-white">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {[
+              { slug: "dress", label: "Dresses" },
+              { slug: "bag", label: "Bags" },
+              { slug: "shoes", label: "Shoes" },
+              { slug: "jacket", label: "Jackets" },
+              { slug: "jeans", label: "Jeans" },
+              { slug: "top", label: "Tops" },
+              { slug: "skirt", label: "Skirts" },
+              { slug: "trainers", label: "Trainers" },
+              { slug: "sunglasses", label: "Sunglasses" },
+              { slug: "jewellery", label: "Jewellery" },
+            ].map(({ slug, label }) => (
+              <Link
+                key={slug}
+                href={`/category/${slug}`}
+                className="shrink-0 text-xs font-semibold border rounded-full px-3.5 py-1.5 hover:bg-gray-50 hover:border-gray-300 transition-colors whitespace-nowrap"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Latest Looks ─────────────────────────────────────── */}
       {looks.length > 0 && (
         <section className="py-16 px-4">
@@ -115,10 +143,10 @@ export default async function HomePage() {
                 </p>
               </div>
               <Link
-                href="/celebrities"
+                href="/looks"
                 className="text-sm font-medium hover:underline hidden sm:block"
               >
-                Browse all →
+                View all looks →
               </Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -173,6 +201,14 @@ export default async function HomePage() {
               ))}
             </div>
           </div>
+          <div className="flex justify-center mt-8 sm:hidden">
+            <Link
+              href="/looks"
+              className="text-sm font-medium border rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+            >
+              View all looks →
+            </Link>
+          </div>
         </section>
       )}
 
@@ -217,6 +253,29 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ── Trending banner ──────────────────────────────────── */}
+      <section className="py-8 px-4 bg-black text-white">
+        <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <div>
+              <p className="font-bold text-sm sm:text-base">
+                See what&apos;s trending right now
+              </p>
+              <p className="text-xs text-gray-400">
+                The hottest celebrity looks this week
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/trending"
+            className="shrink-0 bg-white text-black text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            View trending →
+          </Link>
+        </div>
+      </section>
 
       {/* ── How it works ─────────────────────────────────────── */}
       <section className="py-16 px-4">
