@@ -39,9 +39,13 @@ export default function RootLayout({
         <footer className="border-t py-10 px-4 text-sm text-muted-foreground">
           <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
             <p className="font-bold text-foreground">Spotted</p>
-            <nav className="flex gap-5">
+            <nav className="flex flex-wrap justify-center gap-5">
               <a href="/" className="hover:underline">Home</a>
+              <a href="/celebrities" className="hover:underline">Celebrities</a>
+              <a href="/about" className="hover:underline">About</a>
+              <a href="/contact" className="hover:underline">Contact</a>
               <a href="/privacy" className="hover:underline">Privacy</a>
+              <a href="/terms" className="hover:underline">Terms</a>
             </nav>
             <p>© {new Date().getFullYear()} Spotted. UK Celebrity Fashion.</p>
           </div>
