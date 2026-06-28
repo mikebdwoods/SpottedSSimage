@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { togglePublish, triggerAI } from "@/app/admin/photos/actions";
 import { Button } from "@/components/ui/button";
 
@@ -13,7 +14,9 @@ interface Props {
 }
 
 export function PhotoActions({ photoId, aiStatus, published, celebSlug }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
 
   async function handleTogglePublish() {
     setLoading("publish");
@@ -24,7 +27,10 @@ export function PhotoActions({ photoId, aiStatus, published, celebSlug }: Props)
   async function handleRunAI() {
     setLoading("ai");
     await triggerAI(photoId);
+    setQueued(true);
     setLoading(null);
+    // Refresh after short delay to pick up ai_status = "processing"
+    setTimeout(() => router.refresh(), 1500);
   }
 
   return (
@@ -33,9 +39,9 @@ export function PhotoActions({ photoId, aiStatus, published, celebSlug }: Props)
         size="sm"
         variant="outline"
         onClick={handleRunAI}
-        disabled={loading === "ai" || aiStatus === "processing"}
+        disabled={loading === "ai" || aiStatus === "processing" || queued}
       >
-        {loading === "ai" ? "Running..." : "Run AI"}
+        {queued ? "Queued" : loading === "ai" ? "Sending..." : "Run AI"}
       </Button>
       <Button
         size="sm"

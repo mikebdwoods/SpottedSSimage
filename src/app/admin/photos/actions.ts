@@ -34,23 +34,38 @@ export async function togglePublish(photoId: string, currentPublished: boolean) 
 export async function triggerAI(photoId: string) {
   await requireAdmin();
 
-  const serviceClient = await createServiceClient();
-  await serviceClient
-    .from("photos")
-    .update({ ai_status: "processing" })
-    .eq("id", photoId);
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const secret = process.env.INTERNAL_API_SECRET!;
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-  await fetch(`${supabaseUrl}/functions/v1/process-photo`, {
+  // Fire-and-forget — ai_status tracks progress in DB
+  fetch(`${baseUrl}/api/process-photo`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${serviceKey}`,
+      Authorization: `Bearer ${secret}`,
     },
     body: JSON.stringify({ photo_id: photoId }),
-  });
+  }).catch(() => {});
+
+  revalidatePath("/admin/photos");
+}
+
+export async function triggerAIBatch(photoIds: string[]) {
+  await requireAdmin();
+
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const secret = process.env.INTERNAL_API_SECRET!;
+
+  for (const photoId of photoIds) {
+    fetch(`${baseUrl}/api/process-photo`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ photo_id: photoId }),
+    }).catch(() => {});
+  }
 
   revalidatePath("/admin/photos");
 }

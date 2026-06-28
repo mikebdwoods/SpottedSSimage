@@ -3,17 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
+import { AIStatusPoller } from "@/components/admin/ai-status-poller";
 import {
   AddClothingItemForm,
   DeleteClothingItemButton,
 } from "@/components/admin/add-clothing-item-form";
-
-const STATUS_COLOUR: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  complete: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
-};
 
 export default async function AdminPhotoDetailPage({
   params,
@@ -79,13 +73,7 @@ export default async function AdminPhotoDetailPage({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">AI Status</span>
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                  STATUS_COLOUR[photo.ai_status] ?? "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {photo.ai_status}
-              </span>
+              <AIStatusPoller photoId={photo.id} initialStatus={photo.ai_status} />
             </div>
             {photo.ai_error && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 font-mono break-all">

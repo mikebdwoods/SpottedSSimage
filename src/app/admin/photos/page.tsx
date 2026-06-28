@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
+import { BatchAIButton } from "@/components/admin/batch-ai-button";
+import { ProcessingRefresh } from "@/components/admin/processing-refresh";
 
 const STATUS_COLOUR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -31,18 +33,33 @@ export default async function AdminPhotosPage({
 
   const { data: photos } = await query;
 
+  const pendingPhotoIds =
+    photos?.filter((p) => p.ai_status === "pending").map((p) => p.id) ?? [];
+  const processingCount = photos?.filter((p) => p.ai_status === "processing").length ?? 0;
+
   const statuses = ["pending", "processing", "complete", "failed"];
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <ProcessingRefresh processingCount={processingCount} />
+
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="text-2xl font-bold">Photos</h1>
-        <Link
-          href="/admin/upload"
-          className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
-        >
-          Upload new
-        </Link>
+        <div className="flex items-center gap-2">
+          <BatchAIButton pendingPhotoIds={pendingPhotoIds} />
+          <Link
+            href="/admin/import"
+            className="text-sm border px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Import URL
+          </Link>
+          <Link
+            href="/admin/upload"
+            className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
+          >
+            Upload new
+          </Link>
+        </div>
       </div>
 
       {/* Filter */}
