@@ -72,8 +72,10 @@ export default async function PhotoPage({
 
   if (!photo || !celeb) notFound();
 
+  const itemCount = clothingItems?.length ?? 0;
+
   return (
-    <div className="min-h-screen py-8 px-4">
+    <div className="min-h-screen py-8 px-4 pb-24 md:pb-8">
       <div className="mx-auto max-w-4xl">
         {/* Breadcrumb + share */}
         <div className="flex items-center justify-between mb-6">
@@ -111,7 +113,7 @@ export default async function PhotoPage({
           </div>
 
           {/* Clothing Items */}
-          <div>
+          <div id="clothing-items">
             <h1 className="text-xl font-bold mb-1">{celeb.name}</h1>
             <p className="text-muted-foreground text-sm mb-6">
               {new Date(photo.created_at).toLocaleDateString("en-GB", {
@@ -177,6 +179,26 @@ export default async function PhotoPage({
           />
         </div>
       </div>
+
+      {/* Mobile sticky CTA */}
+      {itemCount > 0 && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">
+              {celeb.name}&apos;s look
+            </p>
+            <p className="text-sm font-semibold">
+              {itemCount} item{itemCount === 1 ? "" : "s"} to shop
+            </p>
+          </div>
+          <a
+            href="#clothing-items"
+            className="bg-black text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-gray-800 transition-colors shrink-0"
+          >
+            Shop the look
+          </a>
+        </div>
+      )}
     </div>
   );
 }
