@@ -91,7 +91,8 @@ export default async function AdminPhotosPage({
                 return (
                   <tr key={photo.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
-                      <div className="w-12 h-16 relative overflow-hidden rounded bg-gray-100">
+                      <Link href={`/admin/photos/${photo.id}`}>
+                      <div className="w-12 h-16 relative overflow-hidden rounded bg-gray-100 hover:opacity-75 transition-opacity">
                         {photo.fallback_image_url ? (
                           <Image
                             src={photo.fallback_image_url}
@@ -106,6 +107,7 @@ export default async function AdminPhotosPage({
                           </div>
                         )}
                       </div>
+                      </Link>
                     </td>
                     <td className="px-4 py-3">{celeb?.name ?? "—"}</td>
                     <td className="px-4 py-3">
