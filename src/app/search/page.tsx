@@ -172,9 +172,9 @@ export default async function SearchPage({
             )}
           </>
         ) : (
-          <div className="py-12 text-center text-muted-foreground">
-            <p className="mb-4 text-sm">Try searching for a celebrity name, item colour, or brand.</p>
-            <div className="flex flex-wrap justify-center gap-2">
+          <div className="py-12 text-muted-foreground">
+            <p className="mb-4 text-sm text-center">Try searching for a celebrity name, item colour, or brand.</p>
+            <div className="flex flex-wrap justify-center gap-2 mb-10">
               {["Dua Lipa", "black dress", "blazer", "Harry Styles", "denim"].map((hint) => (
                 <a
                   key={hint}
@@ -184,6 +184,31 @@ export default async function SearchPage({
                   {hint}
                 </a>
               ))}
+            </div>
+            <div className="border-t pt-8">
+              <p className="text-sm font-semibold mb-4 text-foreground">Browse by category</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { slug: "dress", label: "Dresses" },
+                  { slug: "bag", label: "Bags" },
+                  { slug: "shoes", label: "Shoes" },
+                  { slug: "jacket", label: "Jackets" },
+                  { slug: "jeans", label: "Jeans" },
+                  { slug: "top", label: "Tops" },
+                  { slug: "skirt", label: "Skirts" },
+                  { slug: "trainers", label: "Trainers" },
+                  { slug: "sunglasses", label: "Sunglasses" },
+                  { slug: "jewellery", label: "Jewellery" },
+                ].map(({ slug, label }) => (
+                  <Link
+                    key={slug}
+                    href={`/category/${slug}`}
+                    className="text-xs border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
         )}

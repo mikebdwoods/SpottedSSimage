@@ -34,6 +34,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
+  const categoryUrls: MetadataRoute.Sitemap = [
+    "dress", "top", "jacket", "coat", "jeans", "trousers", "skirt",
+    "shoes", "trainers", "boots", "bag", "sunglasses", "jewellery",
+    "suit", "bodysuit", "shorts", "jumpsuit",
+  ].map((slug) => ({
+    url: `${baseUrl}/category/${slug}`,
+    changeFrequency: "daily" as const,
+    priority: 0.8,
+  }));
+
   const staticUrls: MetadataRoute.Sitemap = [
     { url: baseUrl, changeFrequency: "daily", priority: 1 },
     { url: `${baseUrl}/celebrities`, changeFrequency: "daily", priority: 0.9 },
@@ -45,5 +55,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/terms`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  return [...staticUrls, ...celebUrls, ...photoUrls];
+  return [...staticUrls, ...categoryUrls, ...celebUrls, ...photoUrls];
 }

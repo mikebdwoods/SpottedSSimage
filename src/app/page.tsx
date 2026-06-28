@@ -103,6 +103,34 @@ export default async function HomePage() {
         </div>
       )}
 
+      {/* ── Category Shortcuts ───────────────────────────────── */}
+      <section className="py-6 px-4 border-b bg-white">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {[
+              { slug: "dress", label: "Dresses" },
+              { slug: "bag", label: "Bags" },
+              { slug: "shoes", label: "Shoes" },
+              { slug: "jacket", label: "Jackets" },
+              { slug: "jeans", label: "Jeans" },
+              { slug: "top", label: "Tops" },
+              { slug: "skirt", label: "Skirts" },
+              { slug: "trainers", label: "Trainers" },
+              { slug: "sunglasses", label: "Sunglasses" },
+              { slug: "jewellery", label: "Jewellery" },
+            ].map(({ slug, label }) => (
+              <Link
+                key={slug}
+                href={`/category/${slug}`}
+                className="shrink-0 text-xs font-semibold border rounded-full px-3.5 py-1.5 hover:bg-gray-50 hover:border-gray-300 transition-colors whitespace-nowrap"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Latest Looks ─────────────────────────────────────── */}
       {looks.length > 0 && (
         <section className="py-16 px-4">
