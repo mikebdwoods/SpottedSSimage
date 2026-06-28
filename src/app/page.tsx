@@ -254,6 +254,29 @@ export default async function HomePage() {
         </section>
       )}
 
+      {/* ── Trending banner ──────────────────────────────────── */}
+      <section className="py-8 px-4 bg-black text-white">
+        <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <div>
+              <p className="font-bold text-sm sm:text-base">
+                See what&apos;s trending right now
+              </p>
+              <p className="text-xs text-gray-400">
+                The hottest celebrity looks this week
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/trending"
+            className="shrink-0 bg-white text-black text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            View trending →
+          </Link>
+        </div>
+      </section>
+
       {/* ── How it works ─────────────────────────────────────── */}
       <section className="py-16 px-4">
         <div className="mx-auto max-w-3xl text-center">
