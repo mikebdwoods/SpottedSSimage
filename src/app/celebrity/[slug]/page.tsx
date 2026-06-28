@@ -82,18 +82,25 @@ export default async function CelebrityPage({
 
   if (!celeb) notFound();
 
-  const [{ data: celebPhotos }, { data: celebMerch }] = await Promise.all([
-    supabase
-      .from("photos")
-      .select("id, fallback_image_url, created_at")
-      .eq("celebrity_id", celeb.id)
-      .eq("published", true)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("merch_products")
-      .select("*")
-      .eq("celebrity_id", celeb.id),
-  ]);
+  const [{ data: celebPhotos }, { data: celebMerch }, { data: relatedCelebs }] =
+    await Promise.all([
+      supabase
+        .from("photos")
+        .select("id, fallback_image_url, created_at")
+        .eq("celebrity_id", celeb.id)
+        .eq("published", true)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("merch_products")
+        .select("*")
+        .eq("celebrity_id", celeb.id),
+      supabase
+        .from("celebrities")
+        .select("id, name, slug, image_url")
+        .neq("id", celeb.id)
+        .order("created_at", { ascending: false })
+        .limit(8),
+    ]);
 
   const lookCount = celebPhotos?.length ?? 0;
 
@@ -227,6 +234,43 @@ export default async function CelebrityPage({
                     </p>
                   )}
                 </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Related celebrities */}
+      {relatedCelebs && relatedCelebs.length > 0 && (
+        <section className="py-12 px-4 border-t">
+          <div className="mx-auto max-w-7xl">
+            <h2 className="text-lg font-bold mb-5">More celebrities</h2>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+              {relatedCelebs.map((rc) => (
+                <Link
+                  key={rc.id}
+                  href={`/celebrity/${rc.slug}`}
+                  className="group flex flex-col items-center text-center"
+                >
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-gray-200 mb-1.5 ring-2 ring-transparent group-hover:ring-black transition-all duration-200 relative">
+                    {rc.image_url ? (
+                      <Image
+                        src={rc.image_url}
+                        alt={rc.name}
+                        fill
+                        className="object-cover group-hover:scale-110 transition-transform duration-300"
+                        sizes="64px"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-base font-bold text-gray-400">
+                        {rc.name.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs font-medium leading-tight line-clamp-2">
+                    {rc.name}
+                  </p>
+                </Link>
               ))}
             </div>
           </div>
