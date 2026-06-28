@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 
@@ -48,6 +49,26 @@ export async function triggerAI(photoId: string) {
   }).catch(() => {});
 
   revalidatePath("/admin/photos");
+}
+
+export async function deletePhoto(photoId: string) {
+  const { supabase } = await requireAdmin();
+  // Delete clothing_items first (cascade may handle this, but explicit is safer)
+  await supabase.from("clothing_items").delete().eq("photo_id", photoId);
+  await supabase.from("photos").delete().eq("id", photoId);
+  revalidatePath("/admin/photos");
+  revalidatePath("/");
+  redirect("/admin/photos");
+}
+
+export async function batchPublish(photoIds: string[]) {
+  const { supabase } = await requireAdmin();
+  await supabase
+    .from("photos")
+    .update({ published: true })
+    .in("id", photoIds);
+  revalidatePath("/admin/photos");
+  revalidatePath("/");
 }
 
 export async function triggerAIBatch(photoIds: string[]) {

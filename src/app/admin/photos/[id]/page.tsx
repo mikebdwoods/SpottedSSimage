@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
 import { AIStatusPoller } from "@/components/admin/ai-status-poller";
+import { DeletePhotoButton } from "@/components/admin/delete-photo-button";
 import {
   AddClothingItemForm,
   DeleteClothingItemButton,
@@ -115,13 +116,14 @@ export default async function AdminPhotoDetailPage({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             <PhotoActions
               photoId={photo.id}
               aiStatus={photo.ai_status}
               published={photo.published}
               celebSlug={celeb?.slug}
             />
+            <DeletePhotoButton photoId={photo.id} />
           </div>
         </div>
 

@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { CommentsSection } from "@/components/comments-section";
 import { ShareButton } from "@/components/share-button";
 import { Badge } from "@/components/ui/badge";
+import { PhotoProcessingNotice } from "@/components/photo-processing-notice";
+import { SaveLookButton } from "@/components/save-look-button";
 
 export const revalidate = 60;
 
@@ -41,14 +43,14 @@ export default async function PhotoPage({
   const { slug, id } = await params;
   const supabase = await createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   const [
     { data: photo },
     { data: celeb },
     { data: clothingItems },
     { data: comments },
-    {
-      data: { user },
-    },
+    { data: savedRow },
   ] = await Promise.all([
     supabase
       .from("photos")
@@ -67,12 +69,20 @@ export default async function PhotoPage({
       .select("*, profiles(display_name, avatar_url)")
       .eq("photo_id", id)
       .order("created_at", { ascending: true }),
-    supabase.auth.getUser(),
+    user
+      ? supabase
+          .from("saved_looks")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("photo_id", id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   if (!photo || !celeb) notFound();
 
   const itemCount = clothingItems?.length ?? 0;
+  const isSaved = !!savedRow;
 
   return (
     <div className="min-h-screen py-8 px-4 pb-24 md:pb-8">
@@ -88,7 +98,10 @@ export default async function PhotoPage({
             {" / "}
             <span>Look</span>
           </nav>
-          <ShareButton title={`${celeb.name}'s Look on Spotted`} />
+          <div className="flex items-center gap-2">
+            <SaveLookButton photoId={id} initialSaved={isSaved} isSignedIn={!!user} />
+            <ShareButton title={`${celeb.name}'s Look on Spotted`} />
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -125,10 +138,14 @@ export default async function PhotoPage({
 
             <h2 className="font-semibold mb-4">What they&apos;re wearing</h2>
 
+            <PhotoProcessingNotice photoId={id} status={photo.ai_status} />
+
             {!clothingItems || clothingItems.length === 0 ? (
-              <p className="text-muted-foreground text-sm">
-                Clothing items are being identified — check back soon.
-              </p>
+              photo.ai_status === "complete" ? (
+                <p className="text-muted-foreground text-sm">
+                  No clothing items were identified for this look.
+                </p>
+              ) : null
             ) : (
               <div className="space-y-3">
                 {clothingItems.map((item) => (

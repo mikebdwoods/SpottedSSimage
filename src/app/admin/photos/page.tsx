@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
 import { BatchAIButton } from "@/components/admin/batch-ai-button";
+import { BatchPublishButton } from "@/components/admin/batch-publish-button";
 import { ProcessingRefresh } from "@/components/admin/processing-refresh";
 
 const STATUS_COLOUR: Record<string, string> = {
@@ -36,6 +37,8 @@ export default async function AdminPhotosPage({
   const pendingPhotoIds =
     photos?.filter((p) => p.ai_status === "pending").map((p) => p.id) ?? [];
   const processingCount = photos?.filter((p) => p.ai_status === "processing").length ?? 0;
+  const completeUnpublishedIds =
+    photos?.filter((p) => p.ai_status === "complete" && !p.published).map((p) => p.id) ?? [];
 
   const statuses = ["pending", "processing", "complete", "failed"];
 
@@ -47,6 +50,7 @@ export default async function AdminPhotosPage({
         <h1 className="text-2xl font-bold">Photos</h1>
         <div className="flex items-center gap-2">
           <BatchAIButton pendingPhotoIds={pendingPhotoIds} />
+          <BatchPublishButton completeUnpublishedIds={completeUnpublishedIds} />
           <Link
             href="/admin/import"
             className="text-sm border px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"

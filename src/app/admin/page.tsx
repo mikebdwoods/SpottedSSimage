@@ -42,7 +42,7 @@ export default async function AdminDashboard() {
     { label: "Clothing Items", value: itemCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-green-400" },
     { label: "Product Matches", value: matchCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-amber-400" },
     { label: "Newsletter", value: newsletterCount ?? 0, href: "/admin/newsletter", colour: "border-l-4 border-l-pink-400" },
-    { label: "Comments", value: commentCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-gray-300" },
+    { label: "Comments", value: commentCount ?? 0, href: "/admin/comments", colour: "border-l-4 border-l-gray-300" },
   ];
 
   const quickActions = [
