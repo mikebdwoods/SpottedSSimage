@@ -2,10 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ShoppingBag, ExternalLink, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatPrice } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 
 export const revalidate = 60;
 
@@ -41,10 +40,25 @@ export async function generateMetadata({
 
 type PriceTier = "premium" | "mid" | "budget";
 
-const TIER_LABELS: Record<PriceTier, string> = {
-  premium: "Premium",
-  mid: "Mid-Range",
-  budget: "Budget",
+const TIER_CONFIG: Record<
+  PriceTier,
+  { label: string; range: string; badgeClass: string }
+> = {
+  premium: {
+    label: "Premium",
+    range: "£70+",
+    badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
+  },
+  mid: {
+    label: "Mid-Range",
+    range: "£45–£70",
+    badgeClass: "bg-blue-50 text-blue-800 border-blue-200",
+  },
+  budget: {
+    label: "Budget",
+    range: "under £45",
+    badgeClass: "bg-green-50 text-green-800 border-green-200",
+  },
 };
 
 const TIER_ORDER: PriceTier[] = ["premium", "mid", "budget"];
@@ -81,128 +95,154 @@ export default async function ClothingItemPage({
   );
 
   const hasMatches = productMatches && productMatches.length > 0;
+  const totalMatches = productMatches?.length ?? 0;
 
   return (
-    <div className="min-h-screen py-8 px-4">
-      <div className="mx-auto max-w-5xl">
-        {/* Breadcrumb */}
-        <nav className="text-sm text-muted-foreground mb-6">
-          <Link href="/" className="hover:underline">Home</Link>
-          {" / "}
-          <Link href={`/celebrity/${slug}`} className="hover:underline">
-            {celeb.name}
-          </Link>
-          {" / "}
+    <div className="min-h-screen">
+      {/* Sticky breadcrumb header */}
+      <div className="sticky top-16 z-30 bg-white/95 backdrop-blur border-b py-3 px-4">
+        <div className="mx-auto max-w-5xl flex items-center justify-between gap-4">
           <Link
             href={`/celebrity/${slug}/photo/${item.photo_id}`}
-            className="hover:underline"
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
-            Look
+            <ArrowLeft className="h-4 w-4" />
+            Back to look
           </Link>
-          {" / "}
-          <span className="capitalize">{item.category}</span>
-        </nav>
-
-        {/* Item Header */}
-        <div className="mb-10">
-          <h1 className="text-2xl font-bold capitalize mb-2">{item.category}</h1>
-          {item.style_description && (
-            <p className="text-muted-foreground mb-3">{item.style_description}</p>
-          )}
-          <div className="flex gap-2 flex-wrap">
-            {item.colour && (
-              <Badge variant="outline" className="capitalize">
-                {item.colour}
-              </Badge>
-            )}
-            {item.estimated_brand && (
-              <Badge variant="secondary">{item.estimated_brand}</Badge>
-            )}
-          </div>
-          <Link
-            href={`/celebrity/${slug}/photo/${item.photo_id}`}
-            className="text-sm text-muted-foreground hover:underline mt-4 inline-block"
-          >
-            ← Back to look
-          </Link>
+          <p className="text-sm font-medium text-muted-foreground hidden sm:block">
+            {totalMatches} {totalMatches === 1 ? "match" : "matches"} found
+          </p>
         </div>
+      </div>
 
-        {/* Product Matches */}
-        {!hasMatches ? (
-          <div className="text-center py-16 text-muted-foreground">
-            <p className="text-lg font-medium mb-2">No matches found yet</p>
-            <p className="text-sm">
-              We&apos;re working on finding shoppable alternatives for this item.
-            </p>
+      <div className="py-8 px-4">
+        <div className="mx-auto max-w-5xl">
+          {/* Item header */}
+          <div className="mb-10">
+            <div className="flex items-start gap-4 flex-wrap">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                  {celeb.name}
+                </p>
+                <h1 className="text-3xl font-black tracking-tight capitalize">
+                  {item.category}
+                </h1>
+                {item.style_description && (
+                  <p className="text-muted-foreground mt-2 max-w-xl">
+                    {item.style_description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div className="flex gap-2 mt-4 flex-wrap">
+              {item.colour && (
+                <span className="inline-flex items-center gap-1.5 border rounded-full px-3 py-1 text-sm capitalize">
+                  <span
+                    className="w-3 h-3 rounded-full border border-gray-200"
+                    style={{ background: item.colour.toLowerCase() }}
+                  />
+                  {item.colour}
+                </span>
+              )}
+              {item.estimated_brand && (
+                <span className="border rounded-full px-3 py-1 text-sm font-medium">
+                  {item.estimated_brand}
+                </span>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="space-y-12">
-            {TIER_ORDER.map((tier) => {
-              const items = matchesByTier[tier];
-              if (!items || items.length === 0) return null;
 
-              return (
-                <div key={tier}>
-                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    {TIER_LABELS[tier]}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      {tier === "budget" && "(under £45)"}
-                      {tier === "mid" && "(£45–£70)"}
-                      {tier === "premium" && "(£70+)"}
-                    </span>
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {items.map((match) => (
-                      <div
-                        key={match.id}
-                        className="border rounded-lg overflow-hidden group"
+          {/* Product Matches */}
+          {!hasMatches ? (
+            <div className="text-center py-20 border-2 border-dashed rounded-2xl text-muted-foreground">
+              <ShoppingBag className="h-10 w-10 mx-auto mb-3 opacity-30" />
+              <p className="text-lg font-semibold mb-1">No matches yet</p>
+              <p className="text-sm">
+                We&apos;re finding shoppable alternatives — check back soon.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-14">
+              {TIER_ORDER.map((tier) => {
+                const items = matchesByTier[tier];
+                if (!items || items.length === 0) return null;
+                const config = TIER_CONFIG[tier];
+
+                return (
+                  <div key={tier}>
+                    {/* Tier header */}
+                    <div className="flex items-center gap-3 mb-5">
+                      <h2 className="text-xl font-bold">{config.label}</h2>
+                      <span
+                        className={`text-xs font-semibold border rounded-full px-2.5 py-0.5 ${config.badgeClass}`}
                       >
-                        <div className="aspect-square relative overflow-hidden bg-gray-100">
-                          {match.image_url ? (
-                            <Image
-                              src={match.image_url}
-                              alt={match.product_name}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                              No image
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <p className="text-sm font-medium line-clamp-2">
-                            {match.product_name}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {match.retailer_name}
-                          </p>
-                          {match.price_gbp && (
-                            <p className="text-sm font-semibold mt-1">
-                              {formatPrice(match.price_gbp)}
+                        {config.range}
+                      </span>
+                    </div>
+
+                    {/* Product grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {items.map((match) => (
+                        <a
+                          key={match.id}
+                          href={match.affiliate_url || match.product_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group flex flex-col border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                        >
+                          {/* Product image */}
+                          <div className="aspect-square relative overflow-hidden bg-gray-100">
+                            {match.image_url ? (
+                              <Image
+                                src={match.image_url}
+                                alt={match.product_name}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <ShoppingBag className="h-8 w-8 text-gray-300" />
+                              </div>
+                            )}
+                            {match.match_type === "exact" && (
+                              <div className="absolute top-2 left-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                                Exact match
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Product info */}
+                          <div className="p-3 flex flex-col flex-1">
+                            <p className="text-sm font-semibold line-clamp-2 flex-1">
+                              {match.product_name}
                             </p>
-                          )}
-                          <a
-                            href={match.affiliate_url || match.product_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block mt-3"
-                          >
-                            <Button size="sm" className="w-full">
-                              Buy Now
-                            </Button>
-                          </a>
-                        </div>
-                      </div>
-                    ))}
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {match.retailer_name}
+                            </p>
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                              <p className="text-base font-black">
+                                {match.price_gbp
+                                  ? formatPrice(match.price_gbp)
+                                  : "See price"}
+                              </p>
+                              <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                                Buy
+                                <ExternalLink className="h-3 w-3" />
+                              </span>
+                            </div>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

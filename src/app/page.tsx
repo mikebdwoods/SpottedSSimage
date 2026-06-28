@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewsletterForm } from "@/components/newsletter-form";
+import { CelebritySearch } from "@/components/celebrity-search";
 import { formatPrice } from "@/lib/utils";
 
 export const revalidate = 60;
@@ -34,8 +35,20 @@ export default async function HomePage() {
             Discover what your favourite celebrities are wearing&nbsp;—
             and shop the look for less
           </p>
+          <div className="mt-10 w-full max-w-sm mx-auto">
+            <CelebritySearch
+              celebrities={
+                (featuredCelebs ?? []).map((c) => ({
+                  id: String(c.id ?? ""),
+                  name: String(c.name ?? ""),
+                  slug: String(c.slug ?? ""),
+                  image_url: c.image_url ? String(c.image_url) : null,
+                }))
+              }
+            />
+          </div>
           {featuredCelebs && featuredCelebs.length > 0 && (
-            <div className="flex items-center gap-3 mt-10">
+            <div className="flex items-center gap-3 mt-6">
               <div className="flex -space-x-3">
                 {(featuredCelebs as Row[]).slice(0, 5).map((celeb) => (
                   <div

@@ -3,6 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
+import {
+  AddClothingItemForm,
+  DeleteClothingItemButton,
+} from "@/components/admin/add-clothing-item-form";
 
 const STATUS_COLOUR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
@@ -193,6 +197,10 @@ export default async function AdminPhotoDetailPage({
                           {matchCount} match{matchCount !== 1 ? "es" : ""}
                         </span>
                         <p className="text-xs text-blue-600 mt-2">Edit →</p>
+                        <DeleteClothingItemButton
+                          itemId={item.id}
+                          photoId={photo.id}
+                        />
                       </div>
                     </div>
                   </Link>
@@ -200,6 +208,7 @@ export default async function AdminPhotoDetailPage({
               })}
             </div>
           )}
+          <AddClothingItemForm photoId={photo.id} />
         </div>
       </div>
     </div>
