@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface Comment {
   id: string;
-  content: string;
+  body: string;
   created_at: string;
   profiles: { display_name: string | null; avatar_url: string | null } | null;
 }
@@ -39,7 +39,7 @@ export function CommentsSection({
     const supabase = createClient();
     const { data, error } = await supabase
       .from("comments")
-      .insert({ photo_id: photoId, content: content.trim() })
+      .insert({ photo_id: photoId, body: content.trim(), user_id: currentUser.id })
       .select("*, profiles(display_name, avatar_url)")
       .single();
 
@@ -75,7 +75,7 @@ export function CommentsSection({
               <p className="text-sm text-muted-foreground">
                 {new Date(comment.created_at).toLocaleDateString("en-GB")}
               </p>
-              <p className="text-sm mt-1">{comment.content}</p>
+              <p className="text-sm mt-1">{comment.body}</p>
             </div>
           </div>
         ))}

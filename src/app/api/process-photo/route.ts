@@ -11,9 +11,9 @@ Analyse this celebrity photo and identify every distinct clothing item and acces
 
 For each item return:
 - category: exactly one of [dress, top, jacket, coat, jeans, trousers, skirt, shoes, trainers, boots, bag, sunglasses, jewellery, suit, bodysuit, shorts, jumpsuit, hat, belt, scarf, other]
-- colour: the primary colour in plain English, lowercase (e.g. "black", "white", "navy", "red", "beige", "camel", "emerald green")
-- estimated_brand: the brand name if identifiable from logos or distinctive design details, otherwise null
-- style_description: 1–2 concise sentences describing the garment's style, cut, fabric, and any notable details that would help someone find a similar item
+- color: the primary colour in plain English, lowercase (e.g. "black", "white", "navy", "red", "beige", "camel", "emerald green")
+- brand_guess: the brand name if identifiable from logos or distinctive design details, otherwise null
+- description: 1–2 concise sentences describing the garment's style, cut, fabric, and any notable details that would help someone find a similar item
 
 Guidelines:
 - Identify 3–8 items typically (more for a full outfit, fewer for a close-up)
@@ -23,13 +23,13 @@ Guidelines:
 - For bags, describe the silhouette and hardware (e.g. "structured black leather tote with gold chain strap")
 
 Return ONLY a valid JSON array. No markdown, no explanation, no code blocks. Example:
-[{"category":"dress","colour":"black","estimated_brand":"Versace","style_description":"Floor-length black satin slip dress with thin spaghetti straps and thigh-high side split."},{"category":"shoes","colour":"silver","estimated_brand":null,"style_description":"Strappy silver stiletto heeled sandals with wrap-around ankle ties."}]`;
+[{"category":"dress","color":"black","brand_guess":"Versace","description":"Floor-length black satin slip dress with thin spaghetti straps and thigh-high side split."},{"category":"shoes","color":"silver","brand_guess":null,"description":"Strappy silver stiletto heeled sandals with wrap-around ankle ties."}]`;
 
 interface ClothingItem {
   category: string;
-  colour: string | null;
-  estimated_brand: string | null;
-  style_description: string | null;
+  color: string | null;
+  brand_guess: string | null;
+  description: string | null;
 }
 
 const VALID_CATEGORIES = new Set([
@@ -41,15 +41,13 @@ const VALID_CATEGORIES = new Set([
 function normaliseItems(raw: unknown[]): ClothingItem[] {
   return raw
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
-    .map((item, i) => ({
+    .map((item) => ({
       category: VALID_CATEGORIES.has(String(item.category ?? "").toLowerCase())
         ? String(item.category).toLowerCase()
         : "other",
-      colour: typeof item.colour === "string" ? item.colour.toLowerCase() : null,
-      estimated_brand: typeof item.estimated_brand === "string" ? item.estimated_brand : null,
-      style_description: typeof item.style_description === "string" ? item.style_description : null,
-      sort_order: i,
-      ai_confidence: 0.85,
+      color: typeof item.color === "string" ? item.color.toLowerCase() : null,
+      brand_guess: typeof item.brand_guess === "string" ? item.brand_guess : null,
+      description: typeof item.description === "string" ? item.description : null,
     }));
 }
 
@@ -73,7 +71,7 @@ export async function POST(req: NextRequest) {
   // Mark as processing
   await supabase
     .from("photos")
-    .update({ ai_status: "processing", ai_error: null })
+    .update({ ai_status: "processing", ai_summary: null })
     .eq("id", photo_id);
 
   let imageBase64: string;
@@ -83,7 +81,7 @@ export async function POST(req: NextRequest) {
     // Fetch the photo record
     const { data: photo, error: photoError } = await supabase
       .from("photos")
-      .select("fallback_image_url, storage_path")
+      .select("image_url")
       .eq("id", photo_id)
       .single();
 
@@ -91,7 +89,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`Photo not found: ${photoError?.message}`);
     }
 
-    const imageUrl = photo.fallback_image_url;
+    const imageUrl = photo.image_url;
     if (!imageUrl) throw new Error("Photo has no image URL");
 
     // Download the image
@@ -110,7 +108,7 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase
       .from("photos")
-      .update({ ai_status: "failed", ai_error: msg })
+      .update({ ai_status: "error", ai_summary: msg })
       .eq("id", photo_id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
@@ -161,35 +159,41 @@ export async function POST(req: NextRequest) {
 
     if (items.length === 0) throw new Error("AI returned no clothing items");
 
-    // Delete any existing AI-generated items for this photo
-    await supabase
+    // Replace existing clothing items so re-runs give a clean result.
+    // Delete their matches first to satisfy foreign keys.
+    const { data: oldItems } = await supabase
       .from("clothing_items")
-      .delete()
-      .eq("photo_id", photo_id)
-      .is("ai_confidence", null as never);
+      .select("id")
+      .eq("photo_id", photo_id);
 
-    // Wait — delete all existing clothing items so we get a clean result
-    await supabase.from("clothing_items").delete().eq("photo_id", photo_id);
+    if (oldItems && oldItems.length > 0) {
+      const oldIds = oldItems.map((i) => i.id);
+      await supabase.from("item_matches").delete().in("item_id", oldIds);
+      await supabase.from("clothing_items").delete().in("id", oldIds);
+    }
 
     // Insert new items
     const { error: insertError } = await supabase.from("clothing_items").insert(
-      items.map((item, i) => ({
+      items.map((item) => ({
         photo_id,
         category: item.category,
-        colour: item.colour,
-        estimated_brand: item.estimated_brand,
-        style_description: item.style_description,
-        sort_order: i,
-        ai_confidence: 0.85,
+        color: item.color,
+        brand_guess: item.brand_guess,
+        description: item.description,
+        confidence: 0.85,
+        status: "draft",
       }))
     );
 
     if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
 
-    // Mark complete
+    // Mark done
     await supabase
       .from("photos")
-      .update({ ai_status: "complete" })
+      .update({
+        ai_status: "done",
+        ai_summary: `Identified ${items.length} item${items.length === 1 ? "" : "s"}`,
+      })
       .eq("id", photo_id);
 
     return NextResponse.json({ success: true, items_found: items.length });
@@ -197,7 +201,7 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase
       .from("photos")
-      .update({ ai_status: "failed", ai_error: msg })
+      .update({ ai_status: "error", ai_summary: msg })
       .eq("id", photo_id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }

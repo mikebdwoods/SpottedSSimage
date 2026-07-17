@@ -18,21 +18,22 @@ export default async function TrendingPage() {
     await Promise.all([
       supabase
         .from("celebrities")
-        .select("id, name, slug, image_url, photos(count)")
+        .select("id, name, slug, photo_url, photos(count)")
+        .eq("status", "published")
         .order("created_at", { ascending: false })
         .limit(12),
       supabase
         .from("photos")
         .select(
-          "id, fallback_image_url, created_at, celebrities(name, slug), clothing_items(count)"
+          "id, image_url, created_at, celebrities(name, slug), clothing_items(count)"
         )
-        .eq("published", true)
+        .in("status", ["live", "approved"])
         .order("created_at", { ascending: false })
         .limit(8),
       supabase
         .from("photos")
-        .select("id, fallback_image_url, created_at, celebrities(name, slug)")
-        .eq("published", true)
+        .select("id, image_url, created_at, celebrities(name, slug)")
+        .in("status", ["live", "approved"])
         .order("created_at", { ascending: false })
         .limit(20),
     ]);
@@ -49,7 +50,7 @@ export default async function TrendingPage() {
     id: c.id,
     name: c.name,
     slug: c.slug,
-    image_url: c.image_url,
+    image_url: c.photo_url,
     photo_count:
       Array.isArray(c.photos) && c.photos.length > 0
         ? (c.photos[0] as { count: number }).count
@@ -157,9 +158,9 @@ export default async function TrendingPage() {
                     className="group"
                   >
                     <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
-                      {photo.fallback_image_url ? (
+                      {photo.image_url ? (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt={`${celeb.name} look`}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -212,9 +213,9 @@ export default async function TrendingPage() {
                         i === 0 ? "sm:aspect-auto sm:h-full min-h-[280px]" : ""
                       } relative`}
                     >
-                      {photo.fallback_image_url ? (
+                      {photo.image_url ? (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt={`${celeb.name} look`}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-700"

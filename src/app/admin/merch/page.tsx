@@ -40,7 +40,7 @@ export default async function AdminMerchPage() {
                       {item.image_url ? (
                         <Image
                           src={item.image_url}
-                          alt={item.name}
+                          alt={item.title}
                           fill
                           className="object-cover"
                           sizes="48px"
@@ -52,10 +52,10 @@ export default async function AdminMerchPage() {
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
+                      <p className="text-sm font-medium truncate">{item.title}</p>
                       <p className="text-xs text-muted-foreground">
                         {celeb?.name ?? "—"}
-                        {item.price_gbp ? ` · ${formatPrice(item.price_gbp)}` : ""}
+                        {item.price ? ` · ${formatPrice(Number(item.price))}` : ""}
                       </p>
                     </div>
                     <DeleteMerchButton id={item.id} />

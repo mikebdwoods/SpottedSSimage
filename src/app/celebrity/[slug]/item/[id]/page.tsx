@@ -9,6 +9,24 @@ import { formatPrice } from "@/lib/utils";
 
 export const revalidate = 60;
 
+interface Product {
+  id: string;
+  title: string;
+  brand: string | null;
+  retailer: string | null;
+  price: number | null;
+  currency: string | null;
+  image_url: string | null;
+  product_url: string | null;
+}
+
+interface Match {
+  id: string;
+  match_type: string | null;
+  is_primary: boolean | null;
+  products: Product | null;
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -20,14 +38,14 @@ export async function generateMetadata({
     supabase.from("celebrities").select("name").eq("slug", slug).single(),
     supabase
       .from("clothing_items")
-      .select("category, colour, estimated_brand")
+      .select("category, color, brand_guess")
       .eq("id", id)
       .single(),
   ]);
 
   if (!celeb || !item) return { title: "Shop the Look | Spotted" };
 
-  const parts = [item.colour, item.category, item.estimated_brand].filter(Boolean);
+  const parts = [item.color, item.category, item.brand_guess].filter(Boolean);
   const desc = parts.length
     ? `Shop ${celeb.name}'s ${parts.join(" ")} — find budget, mid-range and premium alternatives.`
     : `Shop ${celeb.name}'s look on Spotted.`;
@@ -64,6 +82,13 @@ const TIER_CONFIG: Record<
 
 const TIER_ORDER: PriceTier[] = ["premium", "mid", "budget"];
 
+function tierForPrice(price: number | null): PriceTier {
+  if (price == null) return "mid";
+  if (price < 45) return "budget";
+  if (price <= 70) return "mid";
+  return "premium";
+}
+
 export default async function ClothingItemPage({
   params,
 }: {
@@ -73,40 +98,45 @@ export default async function ClothingItemPage({
   const supabase = await createClient();
 
   const [{ data: item }, { data: celeb }] = await Promise.all([
-    supabase.from("v_clothing_item").select("*").eq("id", id).single(),
+    supabase.from("clothing_items").select("*").eq("id", id).single(),
     supabase.from("celebrities").select("*").eq("slug", slug).single(),
   ]);
 
   if (!item || !celeb) notFound();
 
-  const [{ data: productMatches }, { data: moreLooks }] = await Promise.all([
+  const [{ data: rawMatches }, { data: moreLooks }] = await Promise.all([
     supabase
-      .from("product_matches")
-      .select("*")
-      .eq("clothing_item_id", id)
-      .order("sort_order", { ascending: true }),
+      .from("item_matches")
+      .select("id, match_type, is_primary, products(*)")
+      .eq("item_id", id)
+      .order("is_primary", { ascending: false }),
     supabase
       .from("photos")
-      .select("id, fallback_image_url")
-      .eq("celebrity_id", celeb.id)
-      .eq("published", true)
+      .select("id, image_url")
+      .eq("celeb_id", celeb.id)
+      .in("status", ["live", "approved"])
       .neq("id", item.photo_id)
       .order("created_at", { ascending: false })
       .limit(4),
   ]);
 
-  const matchesByTier = TIER_ORDER.reduce<
-    Record<PriceTier, typeof productMatches>
-  >(
+  // Only show matches that resolve to a real product with a URL
+  const matches: Match[] = ((rawMatches ?? []) as unknown as Match[]).filter(
+    (m) => m.products && (m.products.product_url || m.products.image_url)
+  );
+
+  const matchesByTier = TIER_ORDER.reduce<Record<PriceTier, Match[]>>(
     (acc, tier) => {
-      acc[tier] = productMatches?.filter((m) => m.price_tier === tier) ?? [];
+      acc[tier] = matches.filter(
+        (m) => tierForPrice(m.products?.price ?? null) === tier
+      );
       return acc;
     },
     { premium: [], mid: [], budget: [] }
   );
 
-  const hasMatches = productMatches && productMatches.length > 0;
-  const totalMatches = productMatches?.length ?? 0;
+  const hasMatches = matches.length > 0;
+  const totalMatches = matches.length;
 
   return (
     <div className="min-h-screen">
@@ -141,9 +171,9 @@ export default async function ClothingItemPage({
                 <h1 className="text-3xl font-black tracking-tight capitalize">
                   {item.category}
                 </h1>
-                {item.style_description && (
+                {item.description && (
                   <p className="text-muted-foreground mt-2 max-w-xl">
-                    {item.style_description}
+                    {item.description}
                   </p>
                 )}
               </div>
@@ -151,18 +181,18 @@ export default async function ClothingItemPage({
 
             {/* Tags */}
             <div className="flex gap-2 mt-4 flex-wrap">
-              {item.colour && (
+              {item.color && (
                 <span className="inline-flex items-center gap-1.5 border rounded-full px-3 py-1 text-sm capitalize">
                   <span
                     className="w-3 h-3 rounded-full border border-gray-200"
-                    style={{ background: item.colour.toLowerCase() }}
+                    style={{ background: item.color.toLowerCase() }}
                   />
-                  {item.colour}
+                  {item.color}
                 </span>
               )}
-              {item.estimated_brand && (
+              {item.brand_guess && (
                 <span className="border rounded-full px-3 py-1 text-sm font-medium">
-                  {item.estimated_brand}
+                  {item.brand_guess}
                 </span>
               )}
             </div>
@@ -198,58 +228,66 @@ export default async function ClothingItemPage({
 
                     {/* Product grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {items.map((match) => (
-                        <a
-                          key={match.id}
-                          href={match.affiliate_url || match.product_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group flex flex-col border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
-                        >
-                          {/* Product image */}
-                          <div className="aspect-square relative overflow-hidden bg-gray-100">
-                            {match.image_url ? (
-                              <Image
-                                src={match.image_url}
-                                alt={match.product_name}
-                                fill
-                                className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ShoppingBag className="h-8 w-8 text-gray-300" />
-                              </div>
-                            )}
-                            {match.match_type === "exact" && (
-                              <div className="absolute top-2 left-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                                Exact match
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Product info */}
-                          <div className="p-3 flex flex-col flex-1">
-                            <p className="text-sm font-semibold line-clamp-2 flex-1">
-                              {match.product_name}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {match.retailer_name}
-                            </p>
-                            <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                              <p className="text-base font-black">
-                                {match.price_gbp
-                                  ? formatPrice(match.price_gbp)
-                                  : "See price"}
-                              </p>
-                              <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                                Buy
-                                <ExternalLink className="h-3 w-3" />
-                              </span>
+                      {items.map((match) => {
+                        const product = match.products!;
+                        return (
+                          <a
+                            key={match.id}
+                            href={product.product_url ?? "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group flex flex-col border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                          >
+                            {/* Product image */}
+                            <div className="aspect-square relative overflow-hidden bg-gray-100">
+                              {product.image_url ? (
+                                <Image
+                                  src={product.image_url}
+                                  alt={product.title}
+                                  fill
+                                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <ShoppingBag className="h-8 w-8 text-gray-300" />
+                                </div>
+                              )}
+                              {match.match_type === "exact" && (
+                                <div className="absolute top-2 left-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                                  Exact match
+                                </div>
+                              )}
+                              {match.is_primary && match.match_type !== "exact" && (
+                                <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
+                                  Top pick
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        </a>
-                      ))}
+
+                            {/* Product info */}
+                            <div className="p-3 flex flex-col flex-1">
+                              <p className="text-sm font-semibold line-clamp-2 flex-1">
+                                {product.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {[product.brand, product.retailer].filter(Boolean).join(" · ")}
+                              </p>
+                              <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                                <p className="text-base font-black">
+                                  {product.price != null
+                                    ? formatPrice(Number(product.price))
+                                    : "See price"}
+                                </p>
+                                <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+                                  Buy
+                                  <ExternalLink className="h-3 w-3" />
+                                </span>
+                              </div>
+                            </div>
+                          </a>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -280,9 +318,9 @@ export default async function ClothingItemPage({
                   className="group"
                 >
                   <div className="aspect-[3/4] relative overflow-hidden rounded-lg bg-gray-200">
-                    {look.fallback_image_url ? (
+                    {look.image_url ? (
                       <Image
-                        src={look.fallback_image_url}
+                        src={look.image_url}
                         alt={`${celeb.name} look`}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -302,7 +340,7 @@ export default async function ClothingItemPage({
       )}
 
       {/* JSON-LD structured data */}
-      {productMatches && productMatches.length > 0 && (
+      {hasMatches && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -310,23 +348,32 @@ export default async function ClothingItemPage({
               "@context": "https://schema.org",
               "@type": "ItemList",
               name: `${celeb.name}'s ${item.category ?? "item"} — shop the look`,
-              numberOfItems: productMatches.length,
-              itemListElement: productMatches.map((match, i) => ({
+              numberOfItems: matches.length,
+              itemListElement: matches.map((match, i) => ({
                 "@type": "ListItem",
                 position: i + 1,
                 item: {
                   "@type": "Product",
-                  name: match.product_name,
+                  name: match.products!.title,
                   offers: {
                     "@type": "Offer",
-                    url: match.affiliate_url || match.product_url,
-                    priceCurrency: "GBP",
-                    ...(match.price_gbp
-                      ? { price: match.price_gbp.toFixed(2) }
+                    url: match.products!.product_url,
+                    priceCurrency: match.products!.currency ?? "GBP",
+                    ...(match.products!.price != null
+                      ? { price: Number(match.products!.price).toFixed(2) }
                       : {}),
-                    seller: { "@type": "Organization", name: match.retailer_name },
+                    ...(match.products!.retailer
+                      ? {
+                          seller: {
+                            "@type": "Organization",
+                            name: match.products!.retailer,
+                          },
+                        }
+                      : {}),
                   },
-                  ...(match.image_url ? { image: match.image_url } : {}),
+                  ...(match.products!.image_url
+                    ? { image: match.products!.image_url }
+                    : {}),
                 },
               })),
             }),

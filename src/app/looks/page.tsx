@@ -44,6 +44,7 @@ export default async function LooksPage({
     supabase
       .from("celebrities")
       .select("id, name, slug")
+      .eq("status", "published")
       .order("name", { ascending: true })
       .limit(40),
   ]);
@@ -61,16 +62,16 @@ export default async function LooksPage({
   // Build main query
   let query = supabase
     .from("photos")
-    .select("id, fallback_image_url, created_at, celebrities(name, slug)", {
+    .select("id, image_url, created_at, celebrities(name, slug)", {
       count: "exact",
     })
-    .eq("published", true)
+    .in("status", ["live", "approved"])
     .order("created_at", { ascending: false })
     .range(from, to);
 
   if (celebSlug) {
     const celeb = celebrities?.find((c) => c.slug === celebSlug);
-    if (celeb) query = query.eq("celebrity_id", celeb.id);
+    if (celeb) query = query.eq("celeb_id", celeb.id);
   }
 
   if (categoryPhotoIds !== null) {
@@ -105,7 +106,7 @@ function buildHref(params: { celeb?: string; cat?: string; page?: number }) {
 }
 
 function renderPage(
-  photos: Array<{ id: string; fallback_image_url: string | null; created_at: string; celebrities: unknown }>,
+  photos: Array<{ id: string; image_url: string | null; created_at: string; celebrities: unknown }>,
   count: number,
   totalPages: number,
   celebrities: Array<{ id: string; name: string; slug: string }>,
@@ -206,9 +207,9 @@ function renderPage(
                     className="group"
                   >
                     <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
-                      {photo.fallback_image_url ? (
+                      {photo.image_url ? (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt={`${celeb.name} look`}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"

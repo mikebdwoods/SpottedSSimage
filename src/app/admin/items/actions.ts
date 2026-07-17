@@ -25,9 +25,9 @@ export async function updateClothingItem(
   id: string,
   data: {
     category?: string;
-    colour?: string;
-    style_description?: string;
-    estimated_brand?: string;
+    color?: string;
+    description?: string;
+    brand_guess?: string;
   }
 ) {
   const supabase = await requireAdmin();
@@ -38,50 +38,76 @@ export async function updateClothingItem(
 export async function addProductMatch(
   clothingItemId: string,
   data: {
-    product_name: string;
-    retailer_name: string;
+    title: string;
+    retailer: string;
+    brand?: string;
     product_url: string;
-    affiliate_url?: string;
     image_url?: string;
-    price_gbp?: number;
-    price_tier: "budget" | "mid" | "premium";
+    price?: number;
     match_type: "exact" | "same_brand" | "similar";
-    sort_order?: number;
   }
 ) {
   const supabase = await requireAdmin();
-  const { error } = await supabase.from("product_matches").insert({
-    clothing_item_id: clothingItemId,
-    ...data,
-    affiliate_url: data.affiliate_url || null,
-    image_url: data.image_url || null,
-    sort_order: data.sort_order ?? 0,
+
+  // Create the product first, then link it to the item
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .insert({
+      title: data.title,
+      retailer: data.retailer,
+      brand: data.brand || null,
+      product_url: data.product_url,
+      image_url: data.image_url || null,
+      price: data.price ?? null,
+      currency: "GBP",
+    })
+    .select("id")
+    .single();
+
+  if (productError) throw new Error(productError.message);
+
+  const { error: matchError } = await supabase.from("item_matches").insert({
+    item_id: clothingItemId,
+    product_id: product.id,
+    match_type: data.match_type,
   });
-  if (error) throw new Error(error.message);
+  if (matchError) throw new Error(matchError.message);
+
   revalidatePath(`/admin/items/${clothingItemId}`);
 }
 
-export async function deleteProductMatch(id: string, clothingItemId: string) {
+export async function deleteProductMatch(matchId: string, clothingItemId: string) {
   const supabase = await requireAdmin();
-  await supabase.from("product_matches").delete().eq("id", id);
+  await supabase.from("item_matches").delete().eq("id", matchId);
   revalidatePath(`/admin/items/${clothingItemId}`);
 }
 
-export async function updateProductMatch(
-  id: string,
+export async function updateMatchedProduct(
+  productId: string,
   clothingItemId: string,
   data: {
-    product_name?: string;
-    retailer_name?: string;
+    title?: string;
+    retailer?: string;
+    brand?: string;
     product_url?: string;
-    affiliate_url?: string;
     image_url?: string;
-    price_gbp?: number;
-    price_tier?: "budget" | "mid" | "premium";
-    match_type?: "exact" | "same_brand" | "similar";
+    price?: number;
   }
 ) {
   const supabase = await requireAdmin();
-  await supabase.from("product_matches").update(data).eq("id", id);
+  await supabase.from("products").update(data).eq("id", productId);
+  revalidatePath(`/admin/items/${clothingItemId}`);
+}
+
+export async function setPrimaryMatch(matchId: string, clothingItemId: string) {
+  const supabase = await requireAdmin();
+  await supabase
+    .from("item_matches")
+    .update({ is_primary: false })
+    .eq("item_id", clothingItemId);
+  await supabase
+    .from("item_matches")
+    .update({ is_primary: true })
+    .eq("id", matchId);
   revalidatePath(`/admin/items/${clothingItemId}`);
 }

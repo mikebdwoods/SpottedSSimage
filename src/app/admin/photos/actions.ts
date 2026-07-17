@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -22,12 +22,9 @@ async function requireAdmin() {
   return { supabase, user };
 }
 
-export async function togglePublish(photoId: string, currentPublished: boolean) {
+export async function setPhotoStatus(photoId: string, status: string) {
   const { supabase } = await requireAdmin();
-  await supabase
-    .from("photos")
-    .update({ published: !currentPublished })
-    .eq("id", photoId);
+  await supabase.from("photos").update({ status }).eq("id", photoId);
   revalidatePath("/admin/photos");
   revalidatePath("/");
 }
@@ -53,8 +50,16 @@ export async function triggerAI(photoId: string) {
 
 export async function deletePhoto(photoId: string) {
   const { supabase } = await requireAdmin();
-  // Delete clothing_items first (cascade may handle this, but explicit is safer)
-  await supabase.from("clothing_items").delete().eq("photo_id", photoId);
+  // Delete matches, then items, then the photo (explicit FK order)
+  const { data: items } = await supabase
+    .from("clothing_items")
+    .select("id")
+    .eq("photo_id", photoId);
+  if (items && items.length > 0) {
+    const ids = items.map((i) => i.id);
+    await supabase.from("item_matches").delete().in("item_id", ids);
+    await supabase.from("clothing_items").delete().in("id", ids);
+  }
   await supabase.from("photos").delete().eq("id", photoId);
   revalidatePath("/admin/photos");
   revalidatePath("/");
@@ -65,7 +70,7 @@ export async function batchPublish(photoIds: string[]) {
   const { supabase } = await requireAdmin();
   await supabase
     .from("photos")
-    .update({ published: true })
+    .update({ status: "live" })
     .in("id", photoIds);
   revalidatePath("/admin/photos");
   revalidatePath("/");

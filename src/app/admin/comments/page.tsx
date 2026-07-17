@@ -10,7 +10,7 @@ export default async function AdminCommentsPage() {
   const { data: comments, count } = await supabase
     .from("comments")
     .select(
-      "id, content, created_at, profiles(display_name), photos(id, celebrities(name, slug))",
+      "id, body, created_at, profiles(display_name), photos(id, celebrities(name, slug))",
       { count: "exact" }
     )
     .order("created_at", { ascending: false })
@@ -63,7 +63,7 @@ export default async function AdminCommentsPage() {
                       })}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{comment.content}</p>
+                  <p className="text-sm text-muted-foreground line-clamp-2">{comment.body}</p>
                 </div>
                 <DeleteCommentButton commentId={comment.id} />
               </div>

@@ -57,11 +57,12 @@ export function UploadForm({ celebrities }: Props) {
     const { data: photo, error: insertError } = await supabase
       .from("photos")
       .insert({
-        celebrity_id: celebrityId,
-        fallback_image_url: publicUrl,
+        celeb_id: celebrityId,
+        image_url: publicUrl,
         source_url: sourceUrl || null,
+        source_type: "upload",
         ai_status: "pending",
-        published: false,
+        status: "queued",
       })
       .select("id")
       .single();

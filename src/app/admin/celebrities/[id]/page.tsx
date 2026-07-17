@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { EditCelebrityForm } from "@/components/admin/edit-celebrity-form";
 import { DeleteCelebrityButton } from "@/components/admin/delete-celebrity-button";
+import { PublishCelebrityToggle } from "@/components/admin/publish-celebrity-toggle";
 
 export default async function AdminCelebrityEditPage({
   params,
@@ -17,8 +18,8 @@ export default async function AdminCelebrityEditPage({
     supabase.from("celebrities").select("*").eq("id", id).single(),
     supabase
       .from("photos")
-      .select("id, fallback_image_url, ai_status, published, created_at")
-      .eq("celebrity_id", id)
+      .select("id, image_url, ai_status, status, created_at")
+      .eq("celeb_id", id)
       .order("created_at", { ascending: false }),
   ]);
 
@@ -40,10 +41,10 @@ export default async function AdminCelebrityEditPage({
         {/* Edit form */}
         <div>
           <div className="flex items-center gap-4 mb-4">
-            {celeb.image_url && (
+            {celeb.photo_url && (
               <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-100 shrink-0">
                 <Image
-                  src={celeb.image_url}
+                  src={celeb.photo_url}
                   alt={celeb.name}
                   fill
                   className="object-cover"
@@ -60,6 +61,13 @@ export default async function AdminCelebrityEditPage({
           </div>
 
           <EditCelebrityForm celebrity={celeb} />
+
+          <div className="mt-6 pt-6 border-t">
+            <PublishCelebrityToggle
+              id={celeb.id}
+              isPublished={celeb.status === "published"}
+            />
+          </div>
 
           <div className="mt-8 pt-6 border-t">
             <p className="text-sm font-medium text-destructive mb-2">Danger zone</p>
@@ -91,9 +99,9 @@ export default async function AdminCelebrityEditPage({
                   href={`/admin/photos/${photo.id}`}
                   className="group relative aspect-[3/4] overflow-hidden rounded-lg bg-gray-100"
                 >
-                  {photo.fallback_image_url ? (
+                  {photo.image_url ? (
                     <Image
-                      src={photo.fallback_image_url}
+                      src={photo.image_url}
                       alt="Photo"
                       fill
                       className="object-cover group-hover:opacity-75 transition-opacity"
@@ -105,8 +113,8 @@ export default async function AdminCelebrityEditPage({
                     </div>
                   )}
                   <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-1.5 py-1 flex justify-between">
-                    <span className={photo.published ? "text-green-400" : "text-gray-400"}>
-                      {photo.published ? "Live" : "Draft"}
+                    <span className={photo.status === "live" ? "text-green-400" : "text-gray-400"}>
+                      <span className="capitalize">{photo.status}</span>
                     </span>
                     <span className="capitalize">{photo.ai_status}</span>
                   </div>

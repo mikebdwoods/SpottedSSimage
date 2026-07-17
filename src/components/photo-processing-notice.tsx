@@ -19,7 +19,7 @@ export function PhotoProcessingNotice({ photoId, status }: Props) {
         const res = await fetch(`/api/photo-status?id=${photoId}`, { cache: "no-store" });
         if (!res.ok) return;
         const { ai_status } = await res.json();
-        if (ai_status === "complete") {
+        if (ai_status === "done") {
           clearInterval(id);
           router.refresh();
         }

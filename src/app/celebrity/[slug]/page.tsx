@@ -16,7 +16,7 @@ export async function generateMetadata({
   const supabase = await createClient();
   const { data: celeb } = await supabase
     .from("celebrities")
-    .select("name, bio, image_url")
+    .select("name, bio, photo_url")
     .eq("slug", slug)
     .single();
 
@@ -26,7 +26,7 @@ export async function generateMetadata({
   const ogParams = new URLSearchParams({
     title: celeb.name,
     subtitle: "Shop the look on Spotted",
-    ...(celeb.image_url ? { image: celeb.image_url } : {}),
+    ...(celeb.photo_url ? { image: celeb.photo_url } : {}),
   });
 
   return {
@@ -52,7 +52,7 @@ export async function generateStaticParams() {
   if (!url || !key) return [];
 
   try {
-    const res = await fetch(`${url}/rest/v1/celebrities?select=slug`, {
+    const res = await fetch(`${url}/rest/v1/celebrities?select=slug&status=eq.published`, {
       headers: {
         apikey: key,
         Authorization: `Bearer ${key}`,
@@ -86,17 +86,19 @@ export default async function CelebrityPage({
     await Promise.all([
       supabase
         .from("photos")
-        .select("id, fallback_image_url, created_at")
-        .eq("celebrity_id", celeb.id)
-        .eq("published", true)
+        .select("id, image_url, headline, created_at")
+        .eq("celeb_id", celeb.id)
+        .in("status", ["live", "approved"])
         .order("created_at", { ascending: false }),
       supabase
         .from("merch_products")
         .select("*")
-        .eq("celebrity_id", celeb.id),
+        .eq("celeb_id", celeb.id)
+        .order("sort_index", { ascending: true }),
       supabase
         .from("celebrities")
-        .select("id, name, slug, image_url")
+        .select("id, name, slug, photo_url")
+        .eq("status", "published")
         .neq("id", celeb.id)
         .order("created_at", { ascending: false })
         .limit(8),
@@ -118,9 +120,9 @@ export default async function CelebrityPage({
         />
         <div className="relative mx-auto max-w-4xl px-4 py-14 flex flex-col sm:flex-row gap-8 items-center sm:items-start">
           <div className="relative w-28 h-28 sm:w-36 sm:h-36 shrink-0">
-            {celeb.image_url ? (
+            {celeb.photo_url ? (
               <Image
-                src={celeb.image_url}
+                src={celeb.photo_url}
                 alt={celeb.name}
                 fill
                 className="object-cover rounded-full ring-4 ring-white/10"
@@ -175,9 +177,9 @@ export default async function CelebrityPage({
                   className="group"
                 >
                   <div className="aspect-[3/4] relative overflow-hidden rounded-lg bg-gray-200">
-                    {photo.fallback_image_url ? (
+                    {photo.image_url ? (
                       <Image
-                        src={photo.fallback_image_url}
+                        src={photo.image_url}
                         alt={`${celeb.name} look`}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -207,7 +209,7 @@ export default async function CelebrityPage({
               {celebMerch.map((item) => (
                 <a
                   key={item.id}
-                  href={item.product_url}
+                  href={item.buy_url || item.product_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group"
@@ -216,7 +218,7 @@ export default async function CelebrityPage({
                     {item.image_url ? (
                       <Image
                         src={item.image_url}
-                        alt={item.name}
+                        alt={item.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                         sizes="(max-width: 640px) 50vw, 25vw"
@@ -227,10 +229,10 @@ export default async function CelebrityPage({
                       </div>
                     )}
                   </div>
-                  <p className="text-sm font-medium">{item.name}</p>
-                  {item.price_gbp && (
+                  <p className="text-sm font-medium">{item.title}</p>
+                  {item.price && (
                     <p className="text-sm text-muted-foreground">
-                      {formatPrice(item.price_gbp)}
+                      {formatPrice(Number(item.price))}
                     </p>
                   )}
                 </a>
@@ -253,9 +255,9 @@ export default async function CelebrityPage({
                   className="group flex flex-col items-center text-center"
                 >
                   <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-gray-200 mb-1.5 ring-2 ring-transparent group-hover:ring-black transition-all duration-200 relative">
-                    {rc.image_url ? (
+                    {rc.photo_url ? (
                       <Image
-                        src={rc.image_url}
+                        src={rc.photo_url}
                         alt={rc.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-300"
@@ -286,7 +288,7 @@ export default async function CelebrityPage({
             "@type": "Person",
             name: celeb.name,
             ...(celeb.bio ? { description: celeb.bio } : {}),
-            ...(celeb.image_url ? { image: celeb.image_url } : {}),
+            ...(celeb.photo_url ? { image: celeb.photo_url } : {}),
           }),
         }}
       />

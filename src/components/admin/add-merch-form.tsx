@@ -4,7 +4,6 @@ import { useState } from "react";
 import { addMerch } from "@/app/admin/merch/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 
 interface Celebrity {
@@ -14,10 +13,10 @@ interface Celebrity {
 
 export function AddMerchForm({ celebrities }: { celebrities: Celebrity[] }) {
   const [form, setForm] = useState({
-    celebrity_id: "",
-    name: "",
-    description: "",
-    price_gbp: "",
+    celeb_id: "",
+    title: "",
+    retailer: "",
+    price: "",
     product_url: "",
     image_url: "",
   });
@@ -34,18 +33,18 @@ export function AddMerchForm({ celebrities }: { celebrities: Celebrity[] }) {
     setError("");
     try {
       await addMerch({
-        celebrity_id: form.celebrity_id,
-        name: form.name,
-        description: form.description || undefined,
-        price_gbp: form.price_gbp ? parseFloat(form.price_gbp) : undefined,
+        celeb_id: form.celeb_id,
+        title: form.title,
+        retailer: form.retailer || undefined,
+        price: form.price ? parseFloat(form.price) : undefined,
         product_url: form.product_url,
         image_url: form.image_url || undefined,
       });
       setForm({
-        celebrity_id: "",
-        name: "",
-        description: "",
-        price_gbp: "",
+        celeb_id: "",
+        title: "",
+        retailer: "",
+        price: "",
         product_url: "",
         image_url: "",
       });
@@ -62,8 +61,8 @@ export function AddMerchForm({ celebrities }: { celebrities: Celebrity[] }) {
       <div>
         <label className="block text-sm font-medium mb-1.5">Celebrity *</label>
         <Select
-          value={form.celebrity_id}
-          onChange={(e) => update("celebrity_id", e.target.value)}
+          value={form.celeb_id}
+          onChange={(e) => update("celeb_id", e.target.value)}
           required
         >
           <option value="">Select celebrity...</option>
@@ -79,31 +78,29 @@ export function AddMerchForm({ celebrities }: { celebrities: Celebrity[] }) {
         <label className="block text-sm font-medium mb-1.5">Product name *</label>
         <Input
           required
-          value={form.name}
-          onChange={(e) => update("name", e.target.value)}
+          value={form.title}
+          onChange={(e) => update("title", e.target.value)}
           placeholder="e.g. Official Tour Hoodie"
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1.5">Description</label>
-        <Textarea
-          value={form.description}
-          onChange={(e) => update("description", e.target.value)}
-          rows={2}
-          placeholder="Short description..."
-        />
-      </div>
-
       <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Retailer</label>
+          <Input
+            value={form.retailer}
+            onChange={(e) => update("retailer", e.target.value)}
+            placeholder="e.g. Official store"
+          />
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">Price (£)</label>
           <Input
             type="number"
             step="0.01"
             min="0"
-            value={form.price_gbp}
-            onChange={(e) => update("price_gbp", e.target.value)}
+            value={form.price}
+            onChange={(e) => update("price", e.target.value)}
             placeholder="29.99"
           />
         </div>

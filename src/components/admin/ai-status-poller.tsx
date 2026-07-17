@@ -11,8 +11,8 @@ interface Props {
 const STATUS_COLOUR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   processing: "bg-blue-100 text-blue-800",
-  complete: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  done: "bg-green-100 text-green-800",
+  error: "bg-red-100 text-red-800",
 };
 
 export function AIStatusPoller({ photoId, initialStatus }: Props) {
@@ -26,7 +26,7 @@ export function AIStatusPoller({ photoId, initialStatus }: Props) {
       if (!res.ok) return;
       const { ai_status } = await res.json();
       setStatus(ai_status);
-      if (ai_status === "complete" || ai_status === "failed") {
+      if (ai_status === "done" || ai_status === "error") {
         router.refresh();
       }
     } catch {

@@ -21,7 +21,8 @@ export default async function SearchPage({
     query.length >= 2
       ? supabase
           .from("celebrities")
-          .select("id, name, slug, image_url, bio")
+          .select("id, name, slug, photo_url, bio")
+          .eq("status", "published")
           .ilike("name", `%${query}%`)
           .order("name")
           .limit(12)
@@ -30,11 +31,12 @@ export default async function SearchPage({
       ? supabase
           .from("clothing_items")
           .select(
-            "id, category, style_description, colour, estimated_brand, photo_id, photos(id, fallback_image_url, celebrities(name, slug))"
+            "id, category, description, color, brand_guess, photo_id, photos!inner(id, image_url, status, celebrities(name, slug))"
           )
           .or(
-            `category.ilike.%${query}%,style_description.ilike.%${query}%,colour.ilike.%${query}%,estimated_brand.ilike.%${query}%`
+            `category.ilike.%${query}%,description.ilike.%${query}%,color.ilike.%${query}%,brand_guess.ilike.%${query}%`
           )
+          .in("photos.status", ["live", "approved"])
           .limit(16)
       : { data: [] },
   ]);
@@ -84,9 +86,9 @@ export default async function SearchPage({
                       className="group flex flex-col items-center text-center p-4 border rounded-xl hover:bg-gray-50 transition-colors"
                     >
                       <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-200 mb-3">
-                        {celeb.image_url ? (
+                        {celeb.photo_url ? (
                           <Image
-                            src={celeb.image_url}
+                            src={celeb.photo_url}
                             alt={celeb.name}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -118,7 +120,7 @@ export default async function SearchPage({
                   {photos.map((item) => {
                     const photo = item.photos as unknown as {
                       id: string;
-                      fallback_image_url: string | null;
+                      image_url: string | null;
                       celebrities: { name: string; slug: string } | null;
                     } | null;
                     const celeb = photo?.celebrities;
@@ -130,9 +132,9 @@ export default async function SearchPage({
                         className="group border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
                       >
                         <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
-                          {photo.fallback_image_url ? (
+                          {photo.image_url ? (
                             <Image
-                              src={photo.fallback_image_url}
+                              src={photo.image_url}
                               alt={`${celeb.name} ${item.category}`}
                               fill
                               className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -147,10 +149,10 @@ export default async function SearchPage({
                         <div className="p-3">
                           <p className="text-xs text-muted-foreground">{celeb.name}</p>
                           <p className="text-sm font-semibold capitalize">{item.category}</p>
-                          {item.colour && (
+                          {item.color && (
                             <p className="text-xs text-muted-foreground capitalize mt-0.5">
-                              {item.colour}
-                              {item.estimated_brand ? ` · ${item.estimated_brand}` : ""}
+                              {item.color}
+                              {item.brand_guess ? ` · ${item.brand_guess}` : ""}
                             </p>
                           )}
                         </div>

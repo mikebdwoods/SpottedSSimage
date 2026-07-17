@@ -25,13 +25,13 @@ export default async function AccountPage() {
       .single(),
     supabase
       .from("comments")
-      .select("id, content, created_at, photos(id, fallback_image_url, celebrities(name, slug))")
+      .select("id, body, created_at, photos(id, image_url, celebrities(name, slug))")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(20),
     supabase
       .from("saved_looks")
-      .select("id, created_at, photos(id, fallback_image_url, celebrities(name, slug))")
+      .select("id, created_at, photos(id, image_url, celebrities(name, slug))")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(24),
@@ -79,7 +79,7 @@ export default async function AccountPage() {
               {savedLooks.map((saved) => {
                 const photo = (saved.photos as unknown) as {
                   id: string;
-                  fallback_image_url: string | null;
+                  image_url: string | null;
                   celebrities: { name: string; slug: string } | null;
                 } | null;
                 const celeb = photo?.celebrities;
@@ -92,9 +92,9 @@ export default async function AccountPage() {
                     title={celeb.name}
                   >
                     <div className="aspect-[3/4] relative overflow-hidden rounded-lg bg-gray-100">
-                      {photo.fallback_image_url ? (
+                      {photo.image_url ? (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt={`${celeb.name} look`}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -133,16 +133,16 @@ export default async function AccountPage() {
               {comments.map((comment) => {
                 const photo = (comment.photos as unknown) as {
                   id: string;
-                  fallback_image_url: string | null;
+                  image_url: string | null;
                   celebrities: { name: string; slug: string } | null;
                 } | null;
                 const celeb = photo?.celebrities;
                 return (
                   <div key={comment.id} className="flex gap-3">
                     <div className="w-10 h-14 rounded overflow-hidden bg-gray-100 shrink-0 relative">
-                      {photo?.fallback_image_url && (
+                      {photo?.image_url && (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt="Look"
                           fill
                           className="object-cover"
@@ -159,7 +159,7 @@ export default async function AccountPage() {
                           {celeb.name}&apos;s look →
                         </Link>
                       )}
-                      <p className="text-sm mt-0.5">{comment.content}</p>
+                      <p className="text-sm mt-0.5">{comment.body}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {new Date(comment.created_at).toLocaleDateString("en-GB", {
                           day: "numeric",

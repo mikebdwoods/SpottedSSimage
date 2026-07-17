@@ -68,11 +68,11 @@ export default async function CategoryPage({
   const { data: items, count } = await supabase
     .from("clothing_items")
     .select(
-      "id, category, colour, estimated_brand, style_description, photos(id, fallback_image_url, celebrities(name, slug))",
+      "id, category, color, brand_guess, description, photos!inner(id, image_url, status, celebrities(name, slug))",
       { count: "exact" }
     )
     .ilike("category", `%${slug}%`)
-    .not("photos", "is", null)
+    .in("photos.status", ["live", "approved"])
     .order("created_at", { ascending: false })
     .range(from, to);
 
@@ -142,7 +142,7 @@ export default async function CategoryPage({
               {items.map((item) => {
                 const photo = item.photos as unknown as {
                   id: string;
-                  fallback_image_url: string | null;
+                  image_url: string | null;
                   celebrities: { name: string; slug: string } | null;
                 } | null;
                 const celeb = photo?.celebrities;
@@ -154,9 +154,9 @@ export default async function CategoryPage({
                     className="group"
                   >
                     <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
-                      {photo.fallback_image_url ? (
+                      {photo.image_url ? (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt={`${celeb.name} ${item.category}`}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -175,9 +175,9 @@ export default async function CategoryPage({
                     </div>
                     <div className="mt-1.5">
                       <p className="text-xs text-muted-foreground">{celeb.name}</p>
-                      {(item.colour || item.estimated_brand) && (
+                      {(item.color || item.brand_guess) && (
                         <p className="text-xs text-muted-foreground capitalize">
-                          {[item.colour, item.estimated_brand].filter(Boolean).join(" · ")}
+                          {[item.color, item.brand_guess].filter(Boolean).join(" · ")}
                         </p>
                       )}
                     </div>

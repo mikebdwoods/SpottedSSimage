@@ -13,16 +13,12 @@ export default async function AdminItemPage({
   const supabase = await createClient();
 
   const [{ data: item }, { data: matches }] = await Promise.all([
+    supabase.from("clothing_items").select("*").eq("id", id).single(),
     supabase
-      .from("v_clothing_item")
-      .select("*")
-      .eq("id", id)
-      .single(),
-    supabase
-      .from("product_matches")
-      .select("*")
-      .eq("clothing_item_id", id)
-      .order("sort_order", { ascending: true }),
+      .from("item_matches")
+      .select("id, match_type, is_primary, products(*)")
+      .eq("item_id", id)
+      .order("is_primary", { ascending: false }),
   ]);
 
   if (!item) notFound();
@@ -53,7 +49,7 @@ export default async function AdminItemPage({
           </h2>
           <ProductMatchList
             clothingItemId={id}
-            initialMatches={matches ?? []}
+            initialMatches={(matches ?? []) as unknown as Parameters<typeof ProductMatchList>[0]["initialMatches"]}
           />
         </div>
       </div>

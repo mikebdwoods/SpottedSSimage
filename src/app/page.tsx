@@ -4,23 +4,40 @@ import { createClient } from "@/lib/supabase/server";
 import { NewsletterForm } from "@/components/newsletter-form";
 import { CelebritySearch } from "@/components/celebrity-search";
 import { formatPrice } from "@/lib/utils";
+import { PUBLIC_PHOTO_STATUSES } from "@/lib/schema";
 
 export const revalidate = 60;
-
-type Row = Record<string, string | number | boolean | null | undefined>;
 
 export default async function HomePage() {
   const supabase = await createClient();
 
-  const [{ data: featuredCelebs }, { data: latestLooks }, { data: merch }] =
+  const [{ data: celebs }, { data: looks }, { data: merch }] =
     await Promise.all([
-      supabase.from("v_home_featured_celebs").select("*"),
-      supabase.from("v_home_latest_looks").select("*"),
-      supabase.from("v_home_merch_products").select("*"),
+      supabase
+        .from("celebrities")
+        .select("id, name, slug, photo_url, is_featured")
+        .eq("status", "published")
+        .order("is_featured", { ascending: false })
+        .order("name", { ascending: true }),
+      supabase
+        .from("photos")
+        .select("id, image_url, headline, created_at, celebrities(name, slug)")
+        .in("status", PUBLIC_PHOTO_STATUSES)
+        .order("created_at", { ascending: false })
+        .limit(11),
+      supabase
+        .from("merch_products")
+        .select("id, title, price, image_url, buy_url, product_url, celebrities(name)")
+        .order("is_featured", { ascending: false })
+        .order("sort_index", { ascending: true })
+        .limit(8),
     ]);
 
-  const topCelebs = (featuredCelebs ?? []) as Row[];
-  const looks = (latestLooks ?? []) as Row[];
+  const topCelebs = celebs ?? [];
+  const latestLooks = (looks ?? []).map((p) => ({
+    ...p,
+    celeb: p.celebrities as unknown as { name: string; slug: string } | null,
+  }));
 
   return (
     <div className="min-h-screen">
@@ -50,10 +67,10 @@ export default async function HomePage() {
           <div className="w-full max-w-sm mx-auto mb-6">
             <CelebritySearch
               celebrities={topCelebs.map((c) => ({
-                id: String(c.id ?? ""),
-                name: String(c.name ?? ""),
-                slug: String(c.slug ?? ""),
-                image_url: c.image_url ? String(c.image_url) : null,
+                id: c.id,
+                name: c.name,
+                slug: c.slug,
+                image_url: c.photo_url,
               }))}
             />
           </div>
@@ -62,13 +79,13 @@ export default async function HomePage() {
               <div className="flex -space-x-3">
                 {topCelebs.slice(0, 6).map((celeb) => (
                   <div
-                    key={celeb.id as string}
+                    key={celeb.id}
                     className="relative w-9 h-9 rounded-full border-2 border-black overflow-hidden bg-gray-700"
                   >
-                    {celeb.image_url && (
+                    {celeb.photo_url && (
                       <Image
-                        src={celeb.image_url as string}
-                        alt={celeb.name as string}
+                        src={celeb.photo_url}
+                        alt={celeb.name}
                         fill
                         className="object-cover"
                         sizes="36px"
@@ -96,7 +113,7 @@ export default async function HomePage() {
                 className="inline-flex items-center gap-2 mx-6 text-xs text-gray-400 hover:text-white transition-colors shrink-0"
               >
                 <span className="w-1 h-1 rounded-full bg-gray-600" />
-                {celeb.name as string}
+                {celeb.name}
               </Link>
             ))}
           </div>
@@ -132,7 +149,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── Latest Looks ─────────────────────────────────────── */}
-      {looks.length > 0 && (
+      {latestLooks.length > 0 && (
         <section className="py-16 px-4">
           <div className="mx-auto max-w-7xl">
             <div className="flex items-baseline justify-between mb-8">
@@ -150,55 +167,58 @@ export default async function HomePage() {
               </Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {looks.map((photo, i) => (
-                <Link
-                  key={photo.id as string}
-                  href={`/celebrity/${photo.celebrity_slug ?? photo.slug}/photo/${photo.id}`}
-                  className={`group relative overflow-hidden rounded-2xl bg-gray-100 ${
-                    i === 0 ? "col-span-2 row-span-2" : ""
-                  }`}
-                >
-                  <div
-                    className={`aspect-[3/4] ${
-                      i === 0 ? "sm:aspect-auto sm:h-full min-h-[360px]" : ""
-                    } relative`}
+              {latestLooks.map((photo, i) => {
+                if (!photo.celeb) return null;
+                return (
+                  <Link
+                    key={photo.id}
+                    href={`/celebrity/${photo.celeb.slug}/photo/${photo.id}`}
+                    className={`group relative overflow-hidden rounded-2xl bg-gray-100 ${
+                      i === 0 ? "col-span-2 row-span-2" : ""
+                    }`}
                   >
-                    {photo.fallback_image_url ? (
-                      <Image
-                        src={photo.fallback_image_url as string}
-                        alt={String(photo.celebrity_name ?? photo.name ?? "Look")}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-700"
-                        sizes={
-                          i === 0
-                            ? "(max-width: 640px) 100vw, 40vw"
-                            : "(max-width: 640px) 50vw, 20vw"
-                        }
-                        priority={i === 0}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        No image
+                    <div
+                      className={`aspect-[3/4] ${
+                        i === 0 ? "sm:aspect-auto sm:h-full min-h-[360px]" : ""
+                      } relative`}
+                    >
+                      {photo.image_url ? (
+                        <Image
+                          src={photo.image_url}
+                          alt={photo.headline ?? `${photo.celeb.name} look`}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-700"
+                          sizes={
+                            i === 0
+                              ? "(max-width: 640px) 100vw, 40vw"
+                              : "(max-width: 640px) 50vw, 20vw"
+                          }
+                          priority={i === 0}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          No image
+                        </div>
+                      )}
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <p className="text-white text-sm font-semibold leading-tight">
+                          {photo.celeb.name}
+                        </p>
+                        <p className="text-white/60 text-xs mt-0.5">Shop the look →</p>
                       </div>
-                    )}
-                    {/* Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
-                      <p className="text-white text-sm font-semibold leading-tight">
-                        {String(photo.celebrity_name ?? photo.name ?? "")}
-                      </p>
-                      <p className="text-white/60 text-xs mt-0.5">Shop the look →</p>
+                      {i === 0 && (
+                        <div className="absolute top-3 left-3">
+                          <span className="bg-white text-black text-xs font-bold px-2.5 py-1 rounded-full">
+                            New
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {i === 0 && (
-                      <div className="absolute top-3 left-3">
-                        <span className="bg-white text-black text-xs font-bold px-2.5 py-1 rounded-full">
-                          New
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           </div>
           <div className="flex justify-center mt-8 sm:hidden">
@@ -225,27 +245,27 @@ export default async function HomePage() {
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 sm:gap-6">
               {topCelebs.map((celeb) => (
                 <Link
-                  key={celeb.id as string}
+                  key={celeb.id}
                   href={`/celebrity/${celeb.slug}`}
                   className="group flex flex-col items-center text-center"
                 >
                   <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-gray-200 mb-2 ring-2 ring-transparent group-hover:ring-black transition-all duration-200">
-                    {celeb.image_url ? (
+                    {celeb.photo_url ? (
                       <Image
-                        src={celeb.image_url as string}
-                        alt={celeb.name as string}
+                        src={celeb.photo_url}
+                        alt={celeb.name}
                         fill
                         className="object-cover group-hover:scale-110 transition-transform duration-300"
                         sizes="80px"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-400">
-                        {(celeb.name as string).charAt(0)}
+                        {celeb.name.charAt(0)}
                       </div>
                     )}
                   </div>
                   <p className="text-xs sm:text-sm font-medium leading-tight line-clamp-2">
-                    {celeb.name as string}
+                    {celeb.name}
                   </p>
                 </Link>
               ))}
@@ -311,37 +331,39 @@ export default async function HomePage() {
               Direct from your favourite celebrities.
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-              {(merch as Row[]).map((item) => (
-                <a
-                  key={item.id as string}
-                  href={item.product_url as string}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group"
-                >
-                  <div className="aspect-square relative overflow-hidden rounded-2xl bg-gray-100 mb-3">
-                    {item.image_url ? (
-                      <Image
-                        src={item.image_url as string}
-                        alt={item.name as string}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                        sizes="(max-width: 640px) 50vw, 25vw"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm font-semibold">{item.name as string}</p>
-                  {item.price_gbp && (
+              {merch.map((item) => {
+                const celeb = item.celebrities as unknown as { name: string } | null;
+                return (
+                  <a
+                    key={item.id}
+                    href={item.buy_url || item.product_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group"
+                  >
+                    <div className="aspect-square relative overflow-hidden rounded-2xl bg-gray-100 mb-3">
+                      {item.image_url ? (
+                        <Image
+                          src={item.image_url}
+                          alt={item.title}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          sizes="(max-width: 640px) 50vw, 25vw"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm font-semibold">{item.title}</p>
                     <p className="text-sm text-muted-foreground">
-                      {formatPrice(item.price_gbp as number)}
+                      {celeb?.name ? `${celeb.name}` : ""}
+                      {item.price ? `${celeb?.name ? " · " : ""}${formatPrice(Number(item.price))}` : ""}
                     </p>
-                  )}
-                </a>
-              ))}
+                  </a>
+                );
+              })}
             </div>
           </div>
         </section>

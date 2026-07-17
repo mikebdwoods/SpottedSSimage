@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("photos")
-    .select("ai_status, ai_error")
+    .select("ai_status, ai_summary")
     .eq("id", id)
     .single();
 
@@ -16,5 +16,5 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ ai_status: data.ai_status, ai_error: data.ai_error });
+  return NextResponse.json({ ai_status: data.ai_status, ai_summary: data.ai_summary });
 }

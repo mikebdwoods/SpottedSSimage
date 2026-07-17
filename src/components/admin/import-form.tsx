@@ -38,11 +38,12 @@ export function ImportForm({ celebrities }: Props) {
     const { data: photo, error: insertError } = await supabase
       .from("photos")
       .insert({
-        celebrity_id: celebrityId,
-        fallback_image_url: imageUrl,
+        celeb_id: celebrityId,
+        image_url: imageUrl,
         source_url: sourceUrl || null,
+        source_type: "import",
         ai_status: "pending",
-        published: false,
+        status: "queued",
       })
       .select("id")
       .single();

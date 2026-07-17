@@ -5,7 +5,6 @@ import { addCelebrity } from "@/app/admin/celebrities/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/select";
 import { slugify } from "@/lib/utils";
 
 export function AddCelebrityForm() {
@@ -52,16 +51,6 @@ export function AddCelebrityForm() {
       <div>
         <label className="block text-sm font-medium mb-1.5">Bio</label>
         <Textarea name="bio" placeholder="Short bio..." rows={3} />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium mb-1.5">Gender</label>
-        <Select name="gender">
-          <option value="">Not specified</option>
-          <option value="female">Female</option>
-          <option value="male">Male</option>
-          <option value="non-binary">Non-binary</option>
-        </Select>
       </div>
 
       <div>

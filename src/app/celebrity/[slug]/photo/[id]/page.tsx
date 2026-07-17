@@ -20,7 +20,7 @@ export async function generateMetadata({
   const supabase = await createClient();
   const [{ data: celeb }, { data: photo }] = await Promise.all([
     supabase.from("celebrities").select("name").eq("slug", slug).single(),
-    supabase.from("photos").select("fallback_image_url").eq("id", id).single(),
+    supabase.from("photos").select("image_url").eq("id", id).single(),
   ]);
 
   if (!celeb) return { title: "Look | Spotted" };
@@ -30,7 +30,7 @@ export async function generateMetadata({
     description: `See what ${celeb.name} is wearing — shop every item in this look.`,
     openGraph: {
       title: `${celeb.name}'s Look | Spotted`,
-      images: photo?.fallback_image_url ? [{ url: photo.fallback_image_url }] : [],
+      images: photo?.image_url ? [{ url: photo.image_url }] : [],
     },
   };
 }
@@ -56,14 +56,14 @@ export default async function PhotoPage({
       .from("photos")
       .select("*")
       .eq("id", id)
-      .eq("published", true)
+      .in("status", ["live", "approved"])
       .single(),
     supabase.from("celebrities").select("*").eq("slug", slug).single(),
     supabase
       .from("clothing_items")
       .select("*")
       .eq("photo_id", id)
-      .order("sort_order", { ascending: true }),
+      .order("created_at", { ascending: true }),
     supabase
       .from("comments")
       .select("*, profiles(display_name, avatar_url)")
@@ -108,9 +108,9 @@ export default async function PhotoPage({
           {/* Photo */}
           <div>
             <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100">
-              {photo.fallback_image_url ? (
+              {photo.image_url ? (
                 <Image
-                  src={photo.fallback_image_url}
+                  src={photo.image_url}
                   alt={`${celeb.name} look`}
                   fill
                   className="object-cover"
@@ -141,7 +141,7 @@ export default async function PhotoPage({
             <PhotoProcessingNotice photoId={id} status={photo.ai_status} />
 
             {!clothingItems || clothingItems.length === 0 ? (
-              photo.ai_status === "complete" ? (
+              photo.ai_status === "done" ? (
                 <p className="text-muted-foreground text-sm">
                   No clothing items were identified for this look.
                 </p>
@@ -157,20 +157,20 @@ export default async function PhotoPage({
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium capitalize">{item.category}</p>
-                        {item.style_description && (
+                        {item.description && (
                           <p className="text-sm text-muted-foreground mt-0.5">
-                            {item.style_description}
+                            {item.description}
                           </p>
                         )}
                         <div className="flex gap-2 mt-2 flex-wrap">
-                          {item.colour && (
+                          {item.color && (
                             <Badge variant="outline" className="text-xs capitalize">
-                              {item.colour}
+                              {item.color}
                             </Badge>
                           )}
-                          {item.estimated_brand && (
+                          {item.brand_guess && (
                             <Badge variant="secondary" className="text-xs">
-                              {item.estimated_brand}
+                              {item.brand_guess}
                             </Badge>
                           )}
                         </div>
