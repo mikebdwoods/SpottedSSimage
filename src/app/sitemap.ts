@@ -49,6 +49,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/celebrities`, changeFrequency: "daily", priority: 0.9 },
     { url: `${baseUrl}/looks`, changeFrequency: "daily", priority: 0.9 },
     { url: `${baseUrl}/trending`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${baseUrl}/news`, changeFrequency: "daily", priority: 0.9 },
     { url: `${baseUrl}/search`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${baseUrl}/about`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${baseUrl}/contact`, changeFrequency: "monthly", priority: 0.4 },

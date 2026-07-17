@@ -82,8 +82,12 @@ export default async function CelebrityPage({
 
   if (!celeb) notFound();
 
-  const [{ data: celebPhotos }, { data: celebMerch }, { data: relatedCelebs }] =
-    await Promise.all([
+  const [
+    { data: celebPhotos },
+    { data: celebMerch },
+    { data: relatedCelebs },
+    { data: newsPosts },
+  ] = await Promise.all([
       supabase
         .from("photos")
         .select("id, image_url, headline, created_at")
@@ -102,6 +106,13 @@ export default async function CelebrityPage({
         .neq("id", celeb.id)
         .order("created_at", { ascending: false })
         .limit(8),
+      supabase
+        .from("external_posts")
+        .select("id, title, image_url, link, publisher_url, source_name, published_at")
+        .eq("celeb_id", celeb.id)
+        .not("image_url", "is", null)
+        .order("published_at", { ascending: false })
+        .limit(6),
     ]);
 
   const lookCount = celebPhotos?.length ?? 0;
@@ -233,6 +244,49 @@ export default async function CelebrityPage({
                   {item.price && (
                     <p className="text-sm text-muted-foreground">
                       {formatPrice(Number(item.price))}
+                    </p>
+                  )}
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* In the news */}
+      {newsPosts && newsPosts.length > 0 && (
+        <section className="py-12 px-4 border-t">
+          <div className="mx-auto max-w-7xl">
+            <div className="flex items-baseline justify-between mb-6">
+              <h2 className="text-xl font-semibold">In the news</h2>
+              <p className="text-xs text-muted-foreground">
+                Latest {celeb.name} coverage from around the web
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {newsPosts.map((post) => (
+                <a
+                  key={post.id}
+                  href={post.publisher_url || post.link || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group"
+                >
+                  <div className="aspect-square relative overflow-hidden rounded-xl bg-gray-100 mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={post.image_url ?? ""}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  </div>
+                  <p className="text-xs font-medium leading-snug line-clamp-2 group-hover:underline">
+                    {post.title}
+                  </p>
+                  {post.source_name && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {post.source_name}
                     </p>
                   )}
                 </a>
