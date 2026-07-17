@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/layout/navbar";
 import { CookieBanner } from "@/components/cookie-banner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -106,6 +107,7 @@ export default function RootLayout({
           </div>
         </footer>
         <CookieBanner />
+        <SpeedInsights />
       </body>
     </html>
   );
