@@ -14,9 +14,9 @@ export function AddClothingItemForm({ photoId }: Props) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     category: "",
-    colour: "",
-    style_description: "",
-    estimated_brand: "",
+    color: "",
+    description: "",
+    brand_guess: "",
   });
   const [status, setStatus] = useState<"idle" | "saving" | "done">("idle");
   const [error, setError] = useState("");
@@ -32,7 +32,7 @@ export function AddClothingItemForm({ photoId }: Props) {
     setError("");
     try {
       await addClothingItem(photoId, form);
-      setForm({ category: "", colour: "", style_description: "", estimated_brand: "" });
+      setForm({ category: "", color: "", description: "", brand_guess: "" });
       setStatus("done");
       setOpen(false);
       setTimeout(() => setStatus("idle"), 2000);
@@ -65,19 +65,19 @@ export function AddClothingItemForm({ photoId }: Props) {
         placeholder="Category (e.g. dress, trainers) *"
       />
       <Input
-        value={form.colour}
-        onChange={(e) => update("colour", e.target.value)}
+        value={form.color}
+        onChange={(e) => update("color", e.target.value)}
         placeholder="Colour (e.g. black, cream)"
       />
       <Textarea
-        value={form.style_description}
-        onChange={(e) => update("style_description", e.target.value)}
+        value={form.description}
+        onChange={(e) => update("description", e.target.value)}
         rows={2}
         placeholder="Style description..."
       />
       <Input
-        value={form.estimated_brand}
-        onChange={(e) => update("estimated_brand", e.target.value)}
+        value={form.brand_guess}
+        onChange={(e) => update("brand_guess", e.target.value)}
         placeholder="Estimated brand (e.g. Zara)"
       />
       {error && <p className="text-sm text-destructive">{error}</p>}

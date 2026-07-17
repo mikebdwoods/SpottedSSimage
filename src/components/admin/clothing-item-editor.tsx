@@ -9,16 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 interface Item {
   id: string;
   category: string | null;
-  colour: string | null;
-  style_description: string | null;
-  estimated_brand: string | null;
+  color: string | null;
+  description: string | null;
+  brand_guess: string | null;
 }
 
 export function ClothingItemEditor({ item }: { item: Item }) {
   const [category, setCategory] = useState(item.category ?? "");
-  const [colour, setColour] = useState(item.colour ?? "");
-  const [styleDesc, setStyleDesc] = useState(item.style_description ?? "");
-  const [brand, setBrand] = useState(item.estimated_brand ?? "");
+  const [colour, setColour] = useState(item.color ?? "");
+  const [styleDesc, setStyleDesc] = useState(item.description ?? "");
+  const [brand, setBrand] = useState(item.brand_guess ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   async function handleSave(e: React.FormEvent) {
@@ -26,9 +26,9 @@ export function ClothingItemEditor({ item }: { item: Item }) {
     setStatus("saving");
     await updateClothingItem(item.id, {
       category,
-      colour,
-      style_description: styleDesc,
-      estimated_brand: brand,
+      color: colour,
+      description: styleDesc,
+      brand_guess: brand,
     });
     setStatus("saved");
     setTimeout(() => setStatus("idle"), 2000);

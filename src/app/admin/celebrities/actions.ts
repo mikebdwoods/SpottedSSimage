@@ -27,7 +27,6 @@ export async function addCelebrity(formData: FormData) {
 
   const name = formData.get("name") as string;
   const bio = formData.get("bio") as string;
-  const gender = formData.get("gender") as string;
   const imageFile = formData.get("image") as File | null;
   let imageUrl: string | null = null;
 
@@ -52,8 +51,8 @@ export async function addCelebrity(formData: FormData) {
     name,
     slug,
     bio: bio || null,
-    gender: gender || null,
-    image_url: imageUrl,
+    photo_url: imageUrl,
+    status: "published",
   });
 
   revalidatePath("/admin/celebrities");
@@ -65,7 +64,6 @@ export async function updateCelebrity(id: string, formData: FormData) {
 
   const name = formData.get("name") as string;
   const bio = formData.get("bio") as string;
-  const gender = formData.get("gender") as string;
   const imageFile = formData.get("image") as File | null;
 
   const { data: current } = await supabase
@@ -77,7 +75,6 @@ export async function updateCelebrity(id: string, formData: FormData) {
   const updates: Record<string, string | null> = {
     name,
     bio: bio || null,
-    gender: gender || null,
   };
 
   if (imageFile && imageFile.size > 0) {
@@ -91,7 +88,7 @@ export async function updateCelebrity(id: string, formData: FormData) {
       const {
         data: { publicUrl },
       } = supabase.storage.from("photos").getPublicUrl(uploadData.path);
-      updates.image_url = publicUrl;
+      updates.photo_url = publicUrl;
     }
   }
 
@@ -105,7 +102,20 @@ export async function updateCelebrity(id: string, formData: FormData) {
 
 export async function deleteCelebrity(id: string) {
   const supabase = await requireAdmin();
-  await supabase.from("celebrities").delete().eq("id", id);
+  // admin_delete_celebrity cleans up photos, merch, and homepage rows too
+  const { error } = await supabase.rpc("admin_delete_celebrity", { p_celeb: id });
+  if (error) throw new Error(error.message);
   revalidatePath("/admin/celebrities");
+  revalidatePath("/");
+}
+
+export async function setCelebrityStatus(id: string, publish: boolean) {
+  const supabase = await requireAdmin();
+  const { error } = await supabase.rpc(publish ? "publish_celeb" : "unpublish_celeb", {
+    _id: id,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/celebrities");
+  revalidatePath(`/admin/celebrities/${id}`);
   revalidatePath("/");
 }

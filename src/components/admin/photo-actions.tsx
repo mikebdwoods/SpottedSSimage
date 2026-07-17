@@ -2,29 +2,37 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { togglePublish, triggerAI } from "@/app/admin/photos/actions";
+import { useRouter } from "next/navigation";
+import { setPhotoStatus, triggerAI } from "@/app/admin/photos/actions";
 import { Button } from "@/components/ui/button";
 
 interface Props {
   photoId: string;
   aiStatus: string;
-  published: boolean;
+  photoStatus: string;
   celebSlug?: string;
 }
 
-export function PhotoActions({ photoId, aiStatus, published, celebSlug }: Props) {
+export function PhotoActions({ photoId, aiStatus, photoStatus, celebSlug }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const [queued, setQueued] = useState(false);
+
+  const isLive = photoStatus === "live";
 
   async function handleTogglePublish() {
     setLoading("publish");
-    await togglePublish(photoId, published);
+    await setPhotoStatus(photoId, isLive ? "hidden" : "live");
     setLoading(null);
   }
 
   async function handleRunAI() {
     setLoading("ai");
     await triggerAI(photoId);
+    setQueued(true);
     setLoading(null);
+    // Refresh after short delay to pick up ai_status = "processing"
+    setTimeout(() => router.refresh(), 1500);
   }
 
   return (
@@ -33,17 +41,17 @@ export function PhotoActions({ photoId, aiStatus, published, celebSlug }: Props)
         size="sm"
         variant="outline"
         onClick={handleRunAI}
-        disabled={loading === "ai" || aiStatus === "processing"}
+        disabled={loading === "ai" || aiStatus === "processing" || queued}
       >
-        {loading === "ai" ? "Running..." : "Run AI"}
+        {queued ? "Queued" : loading === "ai" ? "Sending..." : "Run AI"}
       </Button>
       <Button
         size="sm"
-        variant={published ? "secondary" : "default"}
+        variant={isLive ? "secondary" : "default"}
         onClick={handleTogglePublish}
         disabled={loading === "publish"}
       >
-        {loading === "publish" ? "..." : published ? "Unpublish" : "Publish"}
+        {loading === "publish" ? "..." : isLive ? "Hide" : "Publish"}
       </Button>
       {celebSlug && (
         <Link href={`/celebrity/${celebSlug}/photo/${photoId}`} target="_blank">

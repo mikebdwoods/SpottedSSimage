@@ -13,88 +13,192 @@ export const metadata: Metadata = {
 
 const PAGE_SIZE = 24;
 
+const CATEGORIES = [
+  { slug: "dress", label: "Dresses" },
+  { slug: "top", label: "Tops" },
+  { slug: "jacket", label: "Jackets" },
+  { slug: "coat", label: "Coats" },
+  { slug: "jeans", label: "Jeans" },
+  { slug: "skirt", label: "Skirts" },
+  { slug: "bag", label: "Bags" },
+  { slug: "shoes", label: "Shoes" },
+  { slug: "trainers", label: "Trainers" },
+  { slug: "boots", label: "Boots" },
+  { slug: "sunglasses", label: "Sunglasses" },
+  { slug: "jewellery", label: "Jewellery" },
+];
+
 export default async function LooksPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; celeb?: string; cat?: string }>;
 }) {
-  const { page } = await searchParams;
+  const { page, celeb: celebSlug, cat: categoryFilter } = await searchParams;
   const supabase = await createClient();
 
   const currentPage = Math.max(1, parseInt(page ?? "1", 10));
   const from = (currentPage - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  const [{ data: photos, count }, { data: celebrities }] = await Promise.all([
-    supabase
-      .from("photos")
-      .select("id, fallback_image_url, created_at, celebrities(name, slug)", {
-        count: "exact",
-      })
-      .eq("published", true)
-      .order("created_at", { ascending: false })
-      .range(from, to),
+  const [{ data: celebrities }] = await Promise.all([
     supabase
       .from("celebrities")
       .select("id, name, slug")
+      .eq("status", "published")
       .order("name", { ascending: true })
-      .limit(20),
+      .limit(40),
   ]);
 
+  // If filtering by category, get photo_ids that have that clothing category
+  let categoryPhotoIds: string[] | null = null;
+  if (categoryFilter) {
+    const { data: items } = await supabase
+      .from("clothing_items")
+      .select("photo_id")
+      .eq("category", categoryFilter);
+    categoryPhotoIds = [...new Set((items ?? []).map((i) => i.photo_id))];
+  }
+
+  // Build main query
+  let query = supabase
+    .from("photos")
+    .select("id, image_url, created_at, celebrities(name, slug)", {
+      count: "exact",
+    })
+    .in("status", ["live", "approved"])
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (celebSlug) {
+    const celeb = celebrities?.find((c) => c.slug === celebSlug);
+    if (celeb) query = query.eq("celeb_id", celeb.id);
+  }
+
+  if (categoryPhotoIds !== null) {
+    if (categoryPhotoIds.length === 0) {
+      // No photos have this category
+      return renderPage([], 0, 0, celebrities ?? [], celebSlug, categoryFilter);
+    }
+    query = query.in("id", categoryPhotoIds);
+  }
+
+  const { data: photos, count } = await query;
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
+
+  return renderPage(
+    photos ?? [],
+    count ?? 0,
+    totalPages,
+    celebrities ?? [],
+    celebSlug,
+    categoryFilter,
+    currentPage
+  );
+}
+
+function buildHref(params: { celeb?: string; cat?: string; page?: number }) {
+  const q = new URLSearchParams();
+  if (params.celeb) q.set("celeb", params.celeb);
+  if (params.cat) q.set("cat", params.cat);
+  if (params.page && params.page > 1) q.set("page", String(params.page));
+  const str = q.toString();
+  return `/looks${str ? `?${str}` : ""}`;
+}
+
+function renderPage(
+  photos: Array<{ id: string; image_url: string | null; created_at: string; celebrities: unknown }>,
+  count: number,
+  totalPages: number,
+  celebrities: Array<{ id: string; name: string; slug: string }>,
+  celebSlug: string | undefined,
+  categoryFilter: string | undefined,
+  currentPage = 1
+) {
+  const activeCeleb = celebrities.find((c) => c.slug === celebSlug);
 
   return (
     <div className="min-h-screen">
       {/* Header */}
       <div className="bg-gray-50 border-b py-10 px-4">
         <div className="mx-auto max-w-7xl">
-          <h1 className="text-3xl font-black tracking-tight mb-1">Latest Looks</h1>
+          <h1 className="text-3xl font-black tracking-tight mb-1">
+            {activeCeleb ? `${activeCeleb.name}'s Looks` : "Latest Looks"}
+          </h1>
           <p className="text-muted-foreground text-sm">
-            {count ? `${count} looks — click any to shop the outfit` : "Browse all celebrity looks"}
+            {count ? `${count} look${count === 1 ? "" : "s"} — click any to shop the outfit` : "Browse all celebrity looks"}
           </p>
         </div>
       </div>
 
-      {/* Celebrity quick-filter strip */}
-      {celebrities && celebrities.length > 0 && (
-        <div className="border-b bg-white sticky top-16 z-20">
-          <div className="mx-auto max-w-7xl px-4">
-            <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
+      {/* Filters */}
+      <div className="border-b bg-white sticky top-16 z-20">
+        <div className="mx-auto max-w-7xl px-4">
+          {/* Celebrity filter */}
+          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide border-b">
+            <Link
+              href={buildHref({ cat: categoryFilter })}
+              className={`shrink-0 text-xs font-semibold border rounded-full px-3 py-1.5 transition-colors ${
+                !celebSlug ? "bg-black text-white border-black" : "hover:bg-gray-50"
+              }`}
+            >
+              All
+            </Link>
+            {celebrities.map((celeb) => (
               <Link
-                href="/looks"
-                className="shrink-0 text-xs font-semibold border rounded-full px-3 py-1.5 bg-black text-white"
+                key={celeb.id}
+                href={buildHref({ celeb: celeb.slug, cat: categoryFilter })}
+                className={`shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 transition-colors whitespace-nowrap ${
+                  celebSlug === celeb.slug
+                    ? "bg-black text-white border-black"
+                    : "hover:bg-gray-50"
+                }`}
               >
-                All
+                {celeb.name}
               </Link>
-              {celebrities.map((celeb) => (
-                <Link
-                  key={celeb.id}
-                  href={`/celebrity/${celeb.slug}`}
-                  className="shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 hover:bg-gray-50 transition-colors whitespace-nowrap"
-                >
-                  {celeb.name}
-                </Link>
-              ))}
-            </div>
+            ))}
+          </div>
+          {/* Category filter */}
+          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
+            <Link
+              href={buildHref({ celeb: celebSlug })}
+              className={`shrink-0 text-xs font-semibold border rounded-full px-3 py-1.5 transition-colors ${
+                !categoryFilter ? "bg-black text-white border-black" : "hover:bg-gray-50"
+              }`}
+            >
+              All items
+            </Link>
+            {CATEGORIES.map(({ slug, label }) => (
+              <Link
+                key={slug}
+                href={buildHref({ celeb: celebSlug, cat: slug })}
+                className={`shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 transition-colors whitespace-nowrap ${
+                  categoryFilter === slug
+                    ? "bg-black text-white border-black"
+                    : "hover:bg-gray-50"
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Looks grid */}
       <section className="py-10 px-4">
         <div className="mx-auto max-w-7xl">
-          {!photos || photos.length === 0 ? (
+          {photos.length === 0 ? (
             <div className="text-center py-24 text-muted-foreground">
-              <p className="text-lg font-semibold mb-2">No looks yet</p>
-              <p className="text-sm mb-6">Check back soon — we&apos;re adding new looks daily.</p>
-              <Link href="/celebrities" className="underline font-medium text-sm">
-                Browse celebrities
+              <p className="text-lg font-semibold mb-2">No looks found</p>
+              <p className="text-sm mb-6">Try a different filter.</p>
+              <Link href="/looks" className="underline font-medium text-sm">
+                Clear filters
               </Link>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
               {photos.map((photo) => {
-                const celeb = photo.celebrities as unknown as { name: string; slug: string } | null;
+                const celeb = photo.celebrities as { name: string; slug: string } | null;
                 if (!celeb) return null;
                 return (
                   <Link
@@ -103,9 +207,9 @@ export default async function LooksPage({
                     className="group"
                   >
                     <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
-                      {photo.fallback_image_url ? (
+                      {photo.image_url ? (
                         <Image
-                          src={photo.fallback_image_url}
+                          src={photo.image_url}
                           alt={`${celeb.name} look`}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -138,7 +242,7 @@ export default async function LooksPage({
             <div className="flex items-center justify-center gap-2 mt-12">
               {currentPage > 1 && (
                 <Link
-                  href={`/looks?page=${currentPage - 1}`}
+                  href={buildHref({ celeb: celebSlug, cat: categoryFilter, page: currentPage - 1 })}
                   className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   ← Prev
@@ -147,23 +251,16 @@ export default async function LooksPage({
               <div className="flex gap-1">
                 {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
                   let p: number;
-                  if (totalPages <= 7) {
-                    p = i + 1;
-                  } else if (currentPage <= 4) {
-                    p = i + 1;
-                  } else if (currentPage >= totalPages - 3) {
-                    p = totalPages - 6 + i;
-                  } else {
-                    p = currentPage - 3 + i;
-                  }
+                  if (totalPages <= 7) p = i + 1;
+                  else if (currentPage <= 4) p = i + 1;
+                  else if (currentPage >= totalPages - 3) p = totalPages - 6 + i;
+                  else p = currentPage - 3 + i;
                   return (
                     <Link
                       key={p}
-                      href={`/looks?page=${p}`}
+                      href={buildHref({ celeb: celebSlug, cat: categoryFilter, page: p })}
                       className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                        p === currentPage
-                          ? "bg-black text-white"
-                          : "border hover:bg-gray-50"
+                        p === currentPage ? "bg-black text-white" : "border hover:bg-gray-50"
                       }`}
                     >
                       {p}
@@ -173,7 +270,7 @@ export default async function LooksPage({
               </div>
               {currentPage < totalPages && (
                 <Link
-                  href={`/looks?page=${currentPage + 1}`}
+                  href={buildHref({ celeb: celebSlug, cat: categoryFilter, page: currentPage + 1 })}
                   className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Next →

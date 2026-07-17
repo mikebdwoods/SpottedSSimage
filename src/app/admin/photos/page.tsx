@@ -2,12 +2,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
+import { BatchAIButton } from "@/components/admin/batch-ai-button";
+import { BatchPublishButton } from "@/components/admin/batch-publish-button";
+import { ProcessingRefresh } from "@/components/admin/processing-refresh";
 
-const STATUS_COLOUR: Record<string, string> = {
+const AI_COLOUR: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   processing: "bg-blue-100 text-blue-800",
-  complete: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  done: "bg-green-100 text-green-800",
+  error: "bg-red-100 text-red-800",
+};
+
+const STATUS_COLOUR: Record<string, string> = {
+  queued: "bg-yellow-100 text-yellow-800",
+  approved: "bg-blue-100 text-blue-800",
+  live: "bg-green-100 text-green-800",
+  hidden: "bg-gray-200 text-gray-600",
 };
 
 export default async function AdminPhotosPage({
@@ -21,28 +31,49 @@ export default async function AdminPhotosPage({
   let query = supabase
     .from("photos")
     .select(
-      "id, fallback_image_url, ai_status, published, created_at, celebrities(name, slug)"
+      "id, image_url, ai_status, status, created_at, celebrities(name, slug)"
     )
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(200);
 
   if (status) {
-    query = query.eq("ai_status", status);
+    query = query.eq("status", status);
   }
 
   const { data: photos } = await query;
 
-  const statuses = ["pending", "processing", "complete", "failed"];
+  const pendingPhotoIds =
+    photos?.filter((p) => p.ai_status === "pending" || p.ai_status === "error").map((p) => p.id) ?? [];
+  const processingCount = photos?.filter((p) => p.ai_status === "processing").length ?? 0;
+  const completeUnpublishedIds =
+    photos
+      ?.filter((p) => p.ai_status === "done" && (p.status === "queued" || p.status === "approved"))
+      .map((p) => p.id) ?? [];
+
+  const statuses = ["queued", "approved", "live", "hidden"];
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <ProcessingRefresh processingCount={processingCount} />
+
+      <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
         <h1 className="text-2xl font-bold">Photos</h1>
-        <Link
-          href="/admin/upload"
-          className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
-        >
-          Upload new
-        </Link>
+        <div className="flex items-center gap-2">
+          <BatchAIButton pendingPhotoIds={pendingPhotoIds} />
+          <BatchPublishButton completeUnpublishedIds={completeUnpublishedIds} />
+          <Link
+            href="/admin/import"
+            className="text-sm border px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
+          >
+            Import URL
+          </Link>
+          <Link
+            href="/admin/upload"
+            className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition-colors"
+          >
+            Upload new
+          </Link>
+        </div>
       </div>
 
       {/* Filter */}
@@ -79,8 +110,8 @@ export default async function AdminPhotosPage({
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Photo</th>
                 <th className="text-left px-4 py-3 font-medium">Celebrity</th>
-                <th className="text-left px-4 py-3 font-medium">AI Status</th>
-                <th className="text-left px-4 py-3 font-medium">Published</th>
+                <th className="text-left px-4 py-3 font-medium">AI</th>
+                <th className="text-left px-4 py-3 font-medium">Status</th>
                 <th className="text-left px-4 py-3 font-medium">Date</th>
                 <th className="text-left px-4 py-3 font-medium">Actions</th>
               </tr>
@@ -93,9 +124,9 @@ export default async function AdminPhotosPage({
                     <td className="px-4 py-3">
                       <Link href={`/admin/photos/${photo.id}`}>
                       <div className="w-12 h-16 relative overflow-hidden rounded bg-gray-100 hover:opacity-75 transition-opacity">
-                        {photo.fallback_image_url ? (
+                        {photo.image_url ? (
                           <Image
-                            src={photo.fallback_image_url}
+                            src={photo.image_url}
                             alt="Photo"
                             fill
                             className="object-cover"
@@ -113,7 +144,7 @@ export default async function AdminPhotosPage({
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          STATUS_COLOUR[photo.ai_status] ?? "bg-gray-100 text-gray-700"
+                          AI_COLOUR[photo.ai_status] ?? "bg-gray-100 text-gray-700"
                         }`}
                       >
                         {photo.ai_status}
@@ -121,11 +152,11 @@ export default async function AdminPhotosPage({
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`text-xs font-medium ${
-                          photo.published ? "text-green-600" : "text-gray-400"
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                          STATUS_COLOUR[photo.status] ?? "bg-gray-100 text-gray-700"
                         }`}
                       >
-                        {photo.published ? "Yes" : "No"}
+                        {photo.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
@@ -135,7 +166,7 @@ export default async function AdminPhotosPage({
                       <PhotoActions
                         photoId={photo.id}
                         aiStatus={photo.ai_status}
-                        published={photo.published}
+                        photoStatus={photo.status}
                         celebSlug={celeb?.slug}
                       />
                     </td>

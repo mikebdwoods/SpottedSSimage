@@ -2,10 +2,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 const STATUS_COLOUR: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  complete: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
+  queued: "bg-yellow-100 text-yellow-800",
+  approved: "bg-blue-100 text-blue-800",
+  live: "bg-green-100 text-green-800",
+  hidden: "bg-gray-200 text-gray-600",
 };
 
 export default async function AdminDashboard() {
@@ -24,9 +24,9 @@ export default async function AdminDashboard() {
     supabase
       .from("photos")
       .select("*", { count: "exact", head: true })
-      .eq("published", true),
+      .in("status", ["live", "approved"]),
     supabase.from("clothing_items").select("*", { count: "exact", head: true }),
-    supabase.from("product_matches").select("*", { count: "exact", head: true }),
+    supabase.from("item_matches").select("*", { count: "exact", head: true }),
     supabase.from("newsletter_signups").select("*", { count: "exact", head: true }),
     supabase.from("comments").select("*", { count: "exact", head: true }),
     supabase
@@ -42,7 +42,7 @@ export default async function AdminDashboard() {
     { label: "Clothing Items", value: itemCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-green-400" },
     { label: "Product Matches", value: matchCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-amber-400" },
     { label: "Newsletter", value: newsletterCount ?? 0, href: "/admin/newsletter", colour: "border-l-4 border-l-pink-400" },
-    { label: "Comments", value: commentCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-gray-300" },
+    { label: "Comments", value: commentCount ?? 0, href: "/admin/comments", colour: "border-l-4 border-l-gray-300" },
   ];
 
   const quickActions = [
@@ -118,7 +118,7 @@ export default async function AdminDashboard() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Celebrity</th>
-                <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">AI Status</th>
+                <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Status</th>
                 <th className="text-left px-4 py-3 font-medium hidden md:table-cell">Date</th>
                 <th className="text-right px-4 py-3 font-medium"></th>
               </tr>
@@ -127,15 +127,15 @@ export default async function AdminDashboard() {
               {recentPhotos.map((photo: Record<string, unknown>) => (
                 <tr key={photo.id as string} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">
-                    {(photo.celebrity_name as string) || "—"}
+                    {(photo.celeb_slug as string) || "—"}
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        STATUS_COLOUR[photo.ai_status as string] ?? "bg-gray-100 text-gray-700"
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                        STATUS_COLOUR[photo.status as string] ?? "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {photo.ai_status as string}
+                      {photo.status as string}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs hidden md:table-cell">

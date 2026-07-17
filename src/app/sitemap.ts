@@ -8,11 +8,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://spotted.co.uk";
 
   const [{ data: celebrities }, { data: photos }] = await Promise.all([
-    supabase.from("celebrities").select("slug, created_at"),
+    supabase.from("celebrities").select("slug, created_at").eq("status", "published"),
     supabase
       .from("photos")
-      .select("id, celebrity_id, created_at, celebrities(slug)")
-      .eq("published", true)
+      .select("id, celeb_id, created_at, celebrities(slug)")
+      .in("status", ["live", "approved"])
       .order("created_at", { ascending: false })
       .limit(500),
   ]);

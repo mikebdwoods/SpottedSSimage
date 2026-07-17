@@ -25,21 +25,19 @@ export async function addClothingItem(
   photoId: string,
   data: {
     category: string;
-    colour?: string;
-    style_description?: string;
-    estimated_brand?: string;
-    sort_order?: number;
+    color?: string;
+    description?: string;
+    brand_guess?: string;
   }
 ) {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("clothing_items").insert({
     photo_id: photoId,
     category: data.category,
-    colour: data.colour || null,
-    style_description: data.style_description || null,
-    estimated_brand: data.estimated_brand || null,
-    sort_order: data.sort_order ?? 0,
-    ai_confidence: null,
+    color: data.color || null,
+    description: data.description || null,
+    brand_guess: data.brand_guess || null,
+    status: "live",
   });
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/photos/${photoId}`);
@@ -47,6 +45,7 @@ export async function addClothingItem(
 
 export async function deleteClothingItem(itemId: string, photoId: string) {
   const supabase = await requireAdmin();
+  await supabase.from("item_matches").delete().eq("item_id", itemId);
   await supabase.from("clothing_items").delete().eq("id", itemId);
   revalidatePath(`/admin/photos/${photoId}`);
 }

@@ -3,17 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PhotoActions } from "@/components/admin/photo-actions";
+import { AIStatusPoller } from "@/components/admin/ai-status-poller";
+import { DeletePhotoButton } from "@/components/admin/delete-photo-button";
 import {
   AddClothingItemForm,
   DeleteClothingItemButton,
 } from "@/components/admin/add-clothing-item-form";
-
-const STATUS_COLOUR: Record<string, string> = {
-  pending: "bg-yellow-100 text-yellow-800",
-  processing: "bg-blue-100 text-blue-800",
-  complete: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
-};
 
 export default async function AdminPhotoDetailPage({
   params,
@@ -31,9 +26,9 @@ export default async function AdminPhotoDetailPage({
       .single(),
     supabase
       .from("clothing_items")
-      .select("*, product_matches(id)")
+      .select("*, item_matches(id)")
       .eq("photo_id", id)
-      .order("sort_order", { ascending: true }),
+      .order("created_at", { ascending: true }),
   ]);
 
   if (!photo) notFound();
@@ -56,9 +51,9 @@ export default async function AdminPhotoDetailPage({
         {/* Photo + meta */}
         <div>
           <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100 mb-4">
-            {photo.fallback_image_url ? (
+            {photo.image_url ? (
               <Image
-                src={photo.fallback_image_url}
+                src={photo.image_url}
                 alt="Photo"
                 fill
                 className="object-cover"
@@ -79,27 +74,21 @@ export default async function AdminPhotoDetailPage({
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">AI Status</span>
-              <span
-                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                  STATUS_COLOUR[photo.ai_status] ?? "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {photo.ai_status}
-              </span>
+              <AIStatusPoller photoId={photo.id} initialStatus={photo.ai_status} />
             </div>
-            {photo.ai_error && (
+            {photo.ai_status === "error" && photo.ai_summary && (
               <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-xs text-red-700 font-mono break-all">
-                {photo.ai_error}
+                {photo.ai_summary}
               </div>
             )}
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Published</span>
+              <span className="text-muted-foreground">Status</span>
               <span
                 className={
-                  photo.published ? "text-green-600 font-medium" : "text-gray-400"
+                  photo.status === "live" ? "text-green-600 font-medium capitalize" : "text-gray-500 capitalize"
                 }
               >
-                {photo.published ? "Yes" : "No"}
+                {photo.status}
               </span>
             </div>
             {photo.source_url && (
@@ -127,13 +116,14 @@ export default async function AdminPhotoDetailPage({
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 space-y-3">
             <PhotoActions
               photoId={photo.id}
               aiStatus={photo.ai_status}
-              published={photo.published}
+              photoStatus={photo.status}
               celebSlug={celeb?.slug}
             />
+            <DeletePhotoButton photoId={photo.id} />
           </div>
         </div>
 
@@ -154,8 +144,8 @@ export default async function AdminPhotoDetailPage({
           ) : (
             <div className="space-y-3">
               {clothingItems.map((item) => {
-                const matchCount = Array.isArray(item.product_matches)
-                  ? item.product_matches.length
+                const matchCount = Array.isArray(item.item_matches)
+                  ? item.item_matches.length
                   : 0;
                 return (
                   <Link
@@ -168,20 +158,20 @@ export default async function AdminPhotoDetailPage({
                         <p className="font-medium capitalize">
                           {item.category}
                         </p>
-                        {item.style_description && (
+                        {item.description && (
                           <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
-                            {item.style_description}
+                            {item.description}
                           </p>
                         )}
                         <div className="flex gap-2 mt-2 text-xs">
-                          {item.colour && (
+                          {item.color && (
                             <span className="bg-gray-100 rounded-full px-2 py-0.5 capitalize">
-                              {item.colour}
+                              {item.color}
                             </span>
                           )}
-                          {item.estimated_brand && (
+                          {item.brand_guess && (
                             <span className="bg-gray-100 rounded-full px-2 py-0.5">
-                              {item.estimated_brand}
+                              {item.brand_guess}
                             </span>
                           )}
                         </div>

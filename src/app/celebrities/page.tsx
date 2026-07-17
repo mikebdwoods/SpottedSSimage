@@ -33,8 +33,9 @@ export default async function CelebritiesPage({
   let dbQuery = supabase
     .from("celebrities")
     .select(
-      "id, name, slug, image_url, bio, photos(count)"
+      "id, name, slug, photo_url, bio, photos(count)"
     )
+    .eq("status", "published")
     .order("name", { ascending: true });
 
   if (q) {
@@ -49,7 +50,7 @@ export default async function CelebritiesPage({
     id: c.id,
     name: c.name,
     slug: c.slug,
-    image_url: c.image_url,
+    image_url: c.photo_url,
     bio: c.bio,
     photo_count:
       Array.isArray(c.photos) && c.photos.length > 0

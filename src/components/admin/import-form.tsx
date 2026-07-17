@@ -17,50 +17,31 @@ interface Props {
   celebrities: Celebrity[];
 }
 
-export function UploadForm({ celebrities }: Props) {
+export function ImportForm({ celebrities }: Props) {
   const router = useRouter();
   const [celebrityId, setCelebrityId] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [status, setStatus] = useState<"idle" | "uploading" | "saving" | "done" | "error">("idle");
+  const [preview, setPreview] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [savedPhotoId, setSavedPhotoId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!celebrityId || !imageFile) return;
+    if (!celebrityId || !imageUrl) return;
 
-    setStatus("uploading");
+    setStatus("saving");
     setError("");
     const supabase = createClient();
 
-    // Upload to Supabase Storage
-    const ext = imageFile.name.split(".").pop();
-    const filename = `${crypto.randomUUID()}.${ext}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("photos")
-      .upload(filename, imageFile, { contentType: imageFile.type });
-
-    if (uploadError) {
-      setError(`Upload failed: ${uploadError.message}`);
-      setStatus("error");
-      return;
-    }
-
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("photos").getPublicUrl(uploadData.path);
-
-    setStatus("saving");
-
-    // Insert photo record
     const { data: photo, error: insertError } = await supabase
       .from("photos")
       .insert({
         celeb_id: celebrityId,
-        image_url: publicUrl,
+        image_url: imageUrl,
         source_url: sourceUrl || null,
-        source_type: "upload",
+        source_type: "import",
         ai_status: "pending",
         status: "queued",
       })
@@ -89,15 +70,12 @@ export function UploadForm({ celebrities }: Props) {
         <div className="rounded-lg bg-green-50 border border-green-200 p-4">
           <p className="font-medium text-green-800">Photo saved successfully!</p>
           <p className="text-sm text-green-700 mt-1">
-            The photo has been saved and is ready for AI processing.
+            The photo has been imported and is ready for AI processing.
           </p>
         </div>
         <div className="flex gap-3">
           <Button onClick={handleRunAI}>Run AI now</Button>
-          <Button
-            variant="outline"
-            onClick={() => router.push("/admin/photos")}
-          >
+          <Button variant="outline" onClick={() => router.push("/admin/photos")}>
             Do it later
           </Button>
         </div>
@@ -124,39 +102,54 @@ export function UploadForm({ celebrities }: Props) {
       </div>
 
       <div>
+        <label className="block text-sm font-medium mb-1.5">Image URL *</label>
+        <Input
+          type="url"
+          placeholder="https://example.com/photo.jpg"
+          value={imageUrl}
+          onChange={(e) => {
+            setImageUrl(e.target.value);
+            setPreview(false);
+          }}
+          required
+        />
+        {imageUrl && (
+          <button
+            type="button"
+            className="text-xs text-blue-600 mt-1 hover:underline"
+            onClick={() => setPreview((v) => !v)}
+          >
+            {preview ? "Hide preview" : "Preview image"}
+          </button>
+        )}
+        {preview && imageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl}
+            alt="Preview"
+            className="mt-2 rounded-lg max-h-64 object-contain border"
+          />
+        )}
+      </div>
+
+      <div>
         <label className="block text-sm font-medium mb-1.5">Source URL (optional)</label>
         <Input
           type="url"
-          placeholder="https://..."
+          placeholder="https://... (article or social post URL)"
           value={sourceUrl}
           onChange={(e) => setSourceUrl(e.target.value)}
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1.5">Photo *</label>
-        <Input
-          type="file"
-          accept="image/*"
-          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-          required
-        />
-      </div>
-
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       <Button
         type="submit"
-        disabled={status === "uploading" || status === "saving"}
+        disabled={status === "saving"}
         className="w-full"
       >
-        {status === "uploading"
-          ? "Uploading image..."
-          : status === "saving"
-          ? "Saving..."
-          : "Save photo"}
+        {status === "saving" ? "Saving..." : "Save photo"}
       </Button>
     </form>
   );

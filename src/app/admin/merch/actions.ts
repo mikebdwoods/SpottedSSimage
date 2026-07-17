@@ -22,19 +22,23 @@ async function requireAdmin() {
 }
 
 export async function addMerch(data: {
-  celebrity_id: string;
-  name: string;
-  description?: string;
-  price_gbp?: number;
+  celeb_id: string;
+  title: string;
+  retailer?: string;
+  price?: number;
   product_url: string;
   image_url?: string;
 }) {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("merch_products").insert({
-    ...data,
-    description: data.description || null,
+    celeb_id: data.celeb_id,
+    title: data.title,
+    retailer: data.retailer || null,
+    price: data.price ?? null,
+    currency: "GBP",
+    product_url: data.product_url,
+    buy_url: data.product_url,
     image_url: data.image_url || null,
-    price_gbp: data.price_gbp ?? null,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/admin/merch");

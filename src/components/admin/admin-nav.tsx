@@ -7,9 +7,11 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/photos", label: "Photos" },
   { href: "/admin/upload", label: "Upload" },
+  { href: "/admin/import", label: "Import URL" },
   { href: "/admin/celebrities", label: "Celebrities" },
   { href: "/admin/merch", label: "Merch" },
   { href: "/admin/newsletter", label: "Newsletter" },
+  { href: "/admin/comments", label: "Comments" },
 ];
 
 export function AdminNav() {

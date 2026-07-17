@@ -119,6 +119,7 @@ export function MobileNav({ isAdmin, isSignedIn }: Props) {
                 { href: "/admin", label: "Dashboard" },
                 { href: "/admin/photos", label: "Photos" },
                 { href: "/admin/upload", label: "Upload" },
+                { href: "/admin/import", label: "Import URL" },
                 { href: "/admin/celebrities", label: "Celebrities" },
                 { href: "/admin/merch", label: "Merch" },
               ].map(({ href, label }) => (
