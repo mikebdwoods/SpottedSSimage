@@ -88,6 +88,12 @@ export function MobileNav({ isAdmin, isSignedIn }: Props) {
             Trending
           </Link>
           <Link
+            href="/news"
+            className="block px-3 py-2.5 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            News
+          </Link>
+          <Link
             href="/search"
             className="block px-3 py-2.5 rounded-md text-sm hover:bg-gray-50 transition-colors"
           >
@@ -118,6 +124,7 @@ export function MobileNav({ isAdmin, isSignedIn }: Props) {
               {[
                 { href: "/admin", label: "Dashboard" },
                 { href: "/admin/photos", label: "Photos" },
+                { href: "/admin/feed", label: "Feed Inbox" },
                 { href: "/admin/upload", label: "Upload" },
                 { href: "/admin/import", label: "Import URL" },
                 { href: "/admin/celebrities", label: "Celebrities" },

@@ -63,6 +63,7 @@ export default function RootLayout({
                   <a href="/celebrities" className="block hover:text-foreground transition-colors">All Celebrities</a>
                   <a href="/looks" className="block hover:text-foreground transition-colors">Latest Looks</a>
                   <a href="/trending" className="block hover:text-foreground transition-colors">Trending</a>
+                  <a href="/news" className="block hover:text-foreground transition-colors">News</a>
                   <a href="/search" className="block hover:text-foreground transition-colors">Search</a>
                   <a href="/category/dress" className="block hover:text-foreground transition-colors">Dresses</a>
                   <a href="/category/bag" className="block hover:text-foreground transition-colors">Bags</a>
