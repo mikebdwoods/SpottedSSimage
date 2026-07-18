@@ -15,6 +15,54 @@ Deno.serve(async (req) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
+  async function fetchOne(url: string) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      });
+      const text = await res.text();
+      const ogImage = text.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
+      const ogTitle = text.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
+      const title = ogTitle ?? text.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+      const priceMatch = text.match(/"?price"?\s*[:=]\s*"?£?([0-9]+(?:\.[0-9]{2})?)/i);
+      return { url, status: res.status, ogImage, title, price: priceMatch?.[1] };
+    } catch (err) {
+      return { url, error: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  try {
+    const body = await req.clone().json();
+    if (Array.isArray(body?.fetch_urls)) {
+      const results = [];
+      for (const url of body.fetch_urls.slice(0, 15)) {
+        results.push(await fetchOne(url));
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      return json({ results });
+    }
+    if (typeof body?.fetch_url === "string") {
+      const result = await fetchOne(body.fetch_url);
+      const res = await fetch(body.fetch_url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        },
+      });
+      const text = await res.text();
+      const allHrefs = Array.from(new Set(Array.from(text.matchAll(/href="([^"#]+)"/gi)).map((m) => m[1])));
+      const filterTerm = typeof body?.link_filter === "string" ? body.link_filter.toLowerCase() : null;
+      const links = (filterTerm ? allHrefs.filter((h) => h.toLowerCase().includes(filterTerm)) : allHrefs).slice(0, 60);
+      return json({ ...result, total_links: allHrefs.length, links });
+    }
+  } catch {
+    // fall through to existing behaviour
+  }
+
   let overridePublisherId: string | null = null;
   try {
     const body = await req.json();

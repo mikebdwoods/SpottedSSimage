@@ -213,43 +213,58 @@ earlier only treated the symptom.
 as the 81 backfilled + ongoing resolved photos get AI-tagged, then
 publish a batch and confirm they render correctly on the public site.
 
-### 2. Product catalog is empty — shopping links are barely meaningful
-Only 6 seed products exist in `products` against 26 real `clothing_items`.
-Confirmed live and user-reported: a Liam Gallagher jacket correctly
-AI-read as "C.P. Company" got matched to a ZARA "Leather Effect Jacket"
-and a Gucci "Leather Biker Jacket" — the only two jacket-shaped products
-in the entire catalog — because there's no C.P. Company product to match
-and nothing closer available. That's not enough real inventory for the
-"shop the look" feature to deliver real value. Needs a real product
-catalog — either a retailer feed/API integration or manual curation — to
-make match quality meaningful at scale.
+### 2. Product catalog is thin — shopping links are still limited
+Started at only 6 generic seed products against dozens of real
+`clothing_items`. User-reported: a Liam Gallagher jacket correctly
+AI-read as "C.P. Company" was matching to a ZARA jacket and a Gucci
+jacket — the only two jacket-shaped products that existed — sharing
+nothing with the real garment but category.
 
-Partially mitigated 2026-07-18: the misleading "Top pick" badge (which
-was applied to that Gucci jacket despite it sharing nothing but category
-with the real garment) is now gated on match score, so a bare
-category-only match no longer gets badged as a confident recommendation
-— see `CONFIDENT_MATCH_SCORE` in the item page. The underlying gap
-(nothing genuinely close to match against) still needs a real catalog.
+**Awin checked 2026-07-18**: token works (publisher account `2640528`
+"Spotted", auto-discovered via `/accounts`), but the account has joined
+**zero real retailer programmes** — only Awin's own administrative one.
+Awin requires per-retailer approval (a manual step in their dashboard)
+before any product feed is accessible. User decided to defer this
+("leave the affiliates for now") and go direct-to-retailer instead.
 
-**Awin account connected 2026-07-18** (`AWIN_API_TOKEN` secret, publisher
-account `2640528` "Spotted", auto-discovered via `/accounts` — no need for
-a separately-configured publisher ID secret). Confirmed live: the token
-works, but **the account has joined zero real retailer programmes** —
-only Awin's own administrative programme (id 3). Awin requires applying
-to and being approved by each retailer's affiliate programme
-individually (Selfridges, ASOS, Zara, END., etc.) before their product
-feed becomes accessible — this is a manual step in the Awin dashboard,
-not something that can be automated from here. **Nothing can be synced
-until at least a few programmes are joined.** A throwaway diagnostic
-function (`supabase/functions/awin_test`) confirms credentials and lists
-joined programmes — safe to delete once real sync exists. Rakuten not
-yet connected (user said "we can add more later").
+**Direct-to-retailer sourcing tried 2026-07-18**: attempted to scrape
+real product pages (title/price/image) from ASOS, Zara, and H&M —
+**all three actively block automated requests** (ASOS: HTTP/2 connection
+resets + explicit "Access Denied"; Zara/H&M: 403 on every URL tried).
+This is a hard wall, not a fixable bug — those retailers' bot protection
+rejects datacenter traffic regardless of user-agent. **END. (endclothing.com)
+does not block it** and was usable. C.P. Company's own site (Salesforce
+Commerce Cloud) also responds but renders its product grid client-side,
+so only direct product URLs work, not category-page scraping.
 
-Next step once programmes are joined: build a `sync_products` edge
-function pulling each joined programme's Awin datafeed, generating real
-`awin1.com` tracking links (format
-`https://www.awin1.com/cread.php?awinmid={merchantId}&awinaffid=2640528&clickref=&p={destinationUrl}`),
-and upserting into `products`.
+Added **5 real, verified, direct-link products from END.** (no affiliate
+tracking, `source_affiliate_network = NULL`), each confirmed live with a
+real price and image before insertion:
+- C.P. Company Air-Net Arm Lens Jacket (Olive), £255
+- Diemme Alberone Chelsea Boot (Black), £197
+- Our Legacy Cyphre Chelsea Boot (Black), £281
+- Adsum Daisy Bucket Hat (Light Olive), £19
+- Gentle Monster Pesh Sunglasses (Black), £219
+
+Cleared and regenerated all `item_matches` against the improved catalog.
+**Verified fixed**: the Liam Gallagher jacket's primary match is now the
+real C.P. Company jacket itself (`match_type: exact`, `score: 0.83`),
+correctly outranking the old ZARA/Gucci fallbacks which remain as lower
+`similar` options rather than being deleted.
+
+Catalog is still thin relative to the ~108 `clothing_items` now in the
+system (most categories — dresses, jeans, jewellery, trousers, tops —
+still have zero real products). Two ways to grow it further:
+(a) get Awin retailer programmes approved, which unlocks structured
+feed data instead of scraping; (b) keep sourcing via END. + other
+scraping-friendly sites/brand-direct stores. The diagnostic function
+`supabase/functions/awin_test` now doubles as a URL-verification tool
+(`fetch_urls` array in its POST body) for this — safe to delete once a
+proper `sync_products` function exists.
+
+Also partially mitigated: the misleading "Top pick" badge (previously
+applied to any category-only match regardless of relevance) is now
+gated on match score — see `CONFIDENT_MATCH_SCORE` in the item page.
 
 ### 3. ~~Feed Inbox has never been used to import real content~~ — FIXED (2026-07-18)
 7,425 external posts have been scraped via RSS but, until issue 1 was
