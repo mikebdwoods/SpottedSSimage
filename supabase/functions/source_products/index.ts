@@ -1,15 +1,22 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.76.1";
 
-// Automated product sourcing: for clothing items with no shoppable products,
-// asks Gemini (grounded with Google Search) for real UK product listings
-// matching the item's AI description, then VERIFIES each candidate URL is a
-// live product page before anything is inserted - first by direct fetch,
-// then via the Jina Reader rendering proxy (r.jina.ai) for retailers that
-// block datacenter traffic. Nothing unverified ever enters the catalog.
+// Automated product sourcing: for each clothing item, asks Gemini (grounded
+// with Google Search) for TWO things at once - the EXACT product the
+// celebrity is wearing (when identifiable) and 2-3 CHEAPER high-street
+// alternatives - then VERIFIES every candidate URL is a live product page
+// before anything is inserted: first by direct fetch, then via the Jina
+// Reader rendering proxy (r.jina.ai) for retailers that block datacenter
+// traffic. Nothing unverified ever enters the catalog.
+//
+// Verified products get item_matches written directly (exact -> 'exact',
+// alternatives -> 'dupe'), so the item page can show "the exact one" plus
+// "get the look for less" without relying on the generic matcher.
 //
 // Runs on a cron; each item is attempted exactly once (sourcing_attempted_at
 // is claimed up front), so the backlog drains and the function goes quiet -
-// no repeat Gemini spend on items already tried.
+// no repeat Gemini spend on items already tried. Items on LIVE photos of
+// PUBLISHED celebrities are sourced first - they're the ones people can
+// actually see.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,9 +38,15 @@ const GENERIC_IMAGE_PATTERNS = [
 
 interface Candidate {
   retailer: string;
+  brand: string | null;
   title: string;
   price_gbp: number | null;
   url: string;
+}
+
+interface SourcingResult {
+  exact: Candidate | null;
+  alternatives: Candidate[];
 }
 
 interface Verified {
@@ -149,34 +162,52 @@ function pickJinaImage(text: string, productUrl: string): string | undefined {
   return (hostToken && clean.find((u) => u.includes(hostToken))) || clean[0];
 }
 
-/** Ask Gemini (grounded) for candidate product listings for an item. */
+function normaliseCandidate(c: Record<string, unknown>): Candidate | null {
+  const url = typeof c.url === "string" ? c.url : "";
+  const title = typeof c.title === "string" ? c.title.slice(0, 200) : "";
+  if (!url.startsWith("http") || title.length === 0) return null;
+  return {
+    retailer: typeof c.retailer === "string" ? c.retailer.slice(0, 80) : "Unknown",
+    brand: typeof c.brand === "string" && c.brand.length > 0 ? c.brand.slice(0, 80) : null,
+    title,
+    price_gbp: typeof c.price_gbp === "number" && c.price_gbp > 0 && c.price_gbp < 100000 ? c.price_gbp : null,
+    url,
+  };
+}
+
+/** Ask Gemini (grounded) for the exact product + cheaper alternatives. */
 async function findCandidates(
   geminiKey: string,
-  item: { category: string; color: string | null; description: string | null; brand_guess: string | null }
-): Promise<Candidate[]> {
+  item: { category: string; color: string | null; description: string | null; brand_guess: string | null },
+  celebName: string | null
+): Promise<SourcingResult> {
   const desc = [
     item.brand_guess ? `Brand: ${item.brand_guess}.` : "",
     item.color ? `Colour: ${item.color}.` : "",
     `Category: ${item.category}.`,
     item.description ?? "",
+    celebName ? `Worn by: ${celebName}.` : "",
   ]
     .filter(Boolean)
     .join(" ");
 
-  const prompt = `You are sourcing shoppable products for a UK celebrity-fashion site.
-
-Find up to 3 real, currently-purchasable UK product listings closely matching this item:
+  const prompt = `You are sourcing shoppable products for a UK celebrity-fashion site. A celebrity was photographed wearing this item:
 ${desc}
+
+Do TWO things:
+
+1. EXACT: try to identify the exact product (the actual brand + product name) and find its real, currently-purchasable UK product listing. If the brand is stated, search for that brand + the item's distinctive details. If you cannot identify the exact product with reasonable confidence, set "exact" to null - never guess.
+
+2. CHEAPER ALTERNATIVES: find 2-3 real UK product listings that closely resemble the item but cost LESS than the exact product (or are simply affordable high-street options if the exact price is unknown). Prefer well-known affordable UK retailers: ASOS, Marks & Spencer, New Look, River Island, Mango, Next, Monki, Weekday, Uniqlo, H&M, Missoma (jewellery), endclothing.com (menswear/streetwear). Each alternative from a DIFFERENT retailer.
 
 Rules:
 - Direct product pages only (a single product with a price), never category/search/marketplace pages.
-- Each candidate from a DIFFERENT retailer.
-- Strongly prefer these retailers when they stock a plausible match: endclothing.com, missoma.com, uniqlo.com, cpcompany.com, drmartens.com, brandymelville.co.uk. Other UK retailers are allowed.
-- If the brand is known, one candidate should be the same brand if possible; others can be affordable alternatives.
-- If you cannot find anything genuinely close, return fewer candidates or an empty array. Never invent URLs.
+- Only URLs you found via search results - never construct or invent URLs.
+- If you cannot find anything genuinely close, return fewer alternatives or none.
 
-Return ONLY a JSON array, no markdown, no commentary:
-[{"retailer":"END.","title":"...","price_gbp":129.00,"url":"https://..."}]`;
+Return ONLY a JSON object, no markdown, no commentary:
+{"exact": {"retailer": "...", "brand": "...", "title": "...", "price_gbp": 129.00, "url": "https://..."} or null,
+ "alternatives": [{"retailer": "...", "brand": "...", "title": "...", "price_gbp": 24.99, "url": "https://..."}]}`;
 
   const res = await fetchWithTimeout(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
@@ -200,28 +231,32 @@ Return ONLY a JSON array, no markdown, no commentary:
     .map((p: { text?: string }) => p.text ?? "")
     .join("");
 
-  // Grounded responses wrap the JSON in prose/fences sometimes - extract the array
-  const start = text.indexOf("[");
-  const end = text.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) return [];
+  // Grounded responses wrap the JSON in prose/fences sometimes - extract the object
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) return { exact: null, alternatives: [] };
   let parsed: unknown;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
   } catch {
-    return [];
+    return { exact: null, alternatives: [] };
   }
-  if (!Array.isArray(parsed)) return [];
+  if (typeof parsed !== "object" || parsed === null) return { exact: null, alternatives: [] };
+  const obj = parsed as Record<string, unknown>;
 
-  return parsed
+  const exact =
+    typeof obj.exact === "object" && obj.exact !== null
+      ? normaliseCandidate(obj.exact as Record<string, unknown>)
+      : null;
+  const alternatives = (Array.isArray(obj.alternatives) ? obj.alternatives : [])
     .filter((c): c is Record<string, unknown> => typeof c === "object" && c !== null)
-    .map((c) => ({
-      retailer: typeof c.retailer === "string" ? c.retailer.slice(0, 80) : "Unknown",
-      title: typeof c.title === "string" ? c.title.slice(0, 200) : "",
-      price_gbp: typeof c.price_gbp === "number" && c.price_gbp > 0 && c.price_gbp < 100000 ? c.price_gbp : null,
-      url: typeof c.url === "string" ? c.url : "",
-    }))
-    .filter((c) => c.url.startsWith("http") && c.title.length > 0)
+    .map(normaliseCandidate)
+    .filter((c): c is Candidate => c !== null)
+    // An "alternative" that is the same URL as the exact is noise
+    .filter((c) => !exact || c.url !== exact.url)
     .slice(0, 3);
+
+  return { exact, alternatives };
 }
 
 Deno.serve(async (req) => {
@@ -234,7 +269,7 @@ Deno.serve(async (req) => {
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (!geminiKey) return json({ error: "GEMINI_API_KEY not configured" }, 500);
 
-  let batchSize = 4;
+  let batchSize = 3;
   try {
     const body = await req.json();
     if (typeof body?.batch_size === "number") batchSize = Math.min(Math.max(body.batch_size, 1), 6);
@@ -242,23 +277,103 @@ Deno.serve(async (req) => {
     // defaults are fine
   }
 
-  // Unattempted, shoppable items, newest first. 'other' is mostly
-  // non-fashion (tambourines, phone cases) - not worth Gemini spend.
-  const { data: items, error } = await supabase
+  // Live-first queue: items on live photos of published celebrities are the
+  // ones visitors can actually see, so they get sourced before the queued
+  // backlog. 'other' is mostly non-fashion (tambourines, phone cases) - not
+  // worth Gemini spend.
+  const ITEM_FIELDS = "id, category, color, brand_guess, description, photos!inner(status, celebrities!inner(name, status))";
+  const { data: liveItems, error: liveError } = await supabase
     .from("clothing_items")
-    .select("id, category, color, brand_guess, description")
+    .select(ITEM_FIELDS)
     .is("sourcing_attempted_at", null)
     .neq("category", "other")
     .not("description", "is", null)
+    .eq("photos.status", "live")
+    .eq("photos.celebrities.status", "published")
     .order("created_at", { ascending: false })
     .limit(batchSize);
 
-  if (error) return json({ error: error.message }, 500);
-  if (!items || items.length === 0) return json({ processed: 0, message: "Nothing to source" });
+  if (liveError) return json({ error: liveError.message }, 500);
+
+  let items = liveItems ?? [];
+  if (items.length < batchSize) {
+    const { data: rest } = await supabase
+      .from("clothing_items")
+      .select(ITEM_FIELDS)
+      .is("sourcing_attempted_at", null)
+      .neq("category", "other")
+      .not("description", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(batchSize - items.length);
+    const seen = new Set(items.map((i) => i.id));
+    items = items.concat((rest ?? []).filter((i) => !seen.has(i.id)));
+  }
+
+  if (items.length === 0) return json({ processed: 0, message: "Nothing to source" });
 
   // Claim the batch up front so overlapping cron runs never double-spend
   const ids = items.map((i) => i.id);
   await supabase.from("clothing_items").update({ sourcing_attempted_at: new Date().toISOString() }).in("id", ids);
+
+  // Insert (or reuse) a verified product and write the item_match. Returns
+  // true when the item ended up with a usable match.
+  async function attachProduct(
+    itemId: string,
+    cand: Candidate,
+    verified: Verified,
+    matchType: "exact" | "dupe",
+    score: number
+  ): Promise<boolean> {
+    let productId: string | null = null;
+
+    const { data: existing } = await supabase
+      .from("products")
+      .select("id")
+      .eq("product_url", verified.finalUrl)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      productId = existing.id;
+    } else {
+      // Page-extracted price wins; Gemini's claimed price is used only when
+      // the page confirms nothing (kept nullable - never guessed).
+      const { data: inserted, error: insertError } = await supabase
+        .from("products")
+        .insert({
+          title: verified.title.slice(0, 200),
+          brand: cand.brand,
+          retailer: cand.retailer,
+          price: verified.price ?? cand.price_gbp,
+          currency: "GBP",
+          image_url: verified.image,
+          product_url: verified.finalUrl,
+          source_affiliate_network: null,
+        })
+        .select("id")
+        .single();
+      if (insertError || !inserted) return false;
+      productId = inserted.id;
+    }
+
+    const { data: existingMatch } = await supabase
+      .from("item_matches")
+      .select("id")
+      .eq("item_id", itemId)
+      .eq("product_id", productId)
+      .limit(1)
+      .maybeSingle();
+    if (existingMatch) return true;
+
+    const { error: matchError } = await supabase.from("item_matches").insert({
+      item_id: itemId,
+      product_id: productId,
+      match_type: matchType,
+      score,
+      is_primary: matchType === "exact",
+    });
+    return !matchError;
+  }
 
   let sourced = 0;
   let noSource = 0;
@@ -267,60 +382,45 @@ Deno.serve(async (req) => {
 
   for (const item of items) {
     try {
-      const candidates = await findCandidates(geminiKey, item);
+      // deno-lint-ignore no-explicit-any
+      const celebName = (item as any).photos?.celebrities?.name ?? null;
+      const { exact, alternatives } = await findCandidates(geminiKey, item, celebName);
 
-      let inserted: { title: string; url: string } | null = null;
-      for (const cand of candidates) {
-        // Never re-insert a product we already have
-        const { data: existing } = await supabase
-          .from("products")
-          .select("id")
-          .eq("product_url", cand.url)
-          .limit(1)
-          .maybeSingle();
-        if (existing) {
-          // Product already in catalog - the matcher can use it; count as sourced
-          inserted = { title: cand.title, url: cand.url };
-          break;
-        }
+      let exactAttached = false;
+      let dupesAttached = 0;
 
-        const verified = await verifyCandidate(cand.url);
-        if (!verified) continue;
-
-        // Page-extracted price wins; Gemini's claimed price is used only
-        // when the page confirms nothing (kept nullable - never guessed).
-        const { error: insertError } = await supabase.from("products").insert({
-          title: verified.title.slice(0, 200),
-          brand: null,
-          retailer: cand.retailer,
-          price: verified.price ?? cand.price_gbp,
-          currency: "GBP",
-          image_url: verified.image,
-          product_url: verified.finalUrl,
-          source_affiliate_network: null,
-        });
-        if (!insertError) {
-          inserted = { title: verified.title, url: verified.finalUrl };
-          break;
+      if (exact) {
+        const verified = await verifyCandidate(exact.url);
+        if (verified) {
+          exactAttached = await attachProduct(item.id, exact, verified, "exact", 0.95);
         }
       }
 
-      if (inserted) {
+      for (const alt of alternatives) {
+        const verified = await verifyCandidate(alt.url);
+        if (!verified) continue;
+        const ok = await attachProduct(item.id, alt, verified, "dupe", 0.7);
+        if (ok) dupesAttached++;
+      }
+
+      if (exactAttached || dupesAttached > 0) {
         sourced++;
         await supabase.from("clothing_items").update({ sourcing_status: "sourced" }).eq("id", item.id);
-        // Re-run matching for this item now that a product exists for it.
-        // Clear stale empty state first is unnecessary: matcher skips items
-        // that already have matches, and these have none.
-        fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/match_products`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ item_id: item.id }),
-        }).catch(() => {});
-        results.push({ item_id: item.id, category: item.category, sourced: inserted });
+        results.push({
+          item_id: item.id,
+          category: item.category,
+          exact: exactAttached ? exact?.title : null,
+          dupes: dupesAttached,
+        });
       } else {
         noSource++;
         await supabase.from("clothing_items").update({ sourcing_status: "no_source" }).eq("id", item.id);
-        results.push({ item_id: item.id, category: item.category, sourced: null, candidates_tried: candidates.length });
+        results.push({
+          item_id: item.id,
+          category: item.category,
+          sourced: null,
+          candidates_tried: (exact ? 1 : 0) + alternatives.length,
+        });
       }
     } catch (err) {
       errored++;
