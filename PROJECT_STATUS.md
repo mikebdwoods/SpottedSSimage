@@ -60,12 +60,32 @@ worker doesn't recover on its own, the remaining remedy is a **project
 restart from the Supabase dashboard** (Settings → General → Restart
 project) — needs the owner, ~1 min of downtime.
 
-**Bigger picture:** both failure modes trace to the same thing — the
-project's compute tier allots very few background-worker slots and one
-easily-overwhelmed pg_net worker, while the pipeline now runs 8 cron
-jobs and hundreds of edge-function calls a day. If these incidents
-recur, the durable fix is a compute upgrade in the Supabase dashboard
-(paid; owner decision).
+**Root cause 3 — the deepest layer (FOUND ~23:00 UTC, fix applied,
+recovery requires owner action):** `net._http_response` (the pg_net
+delivery log) had **never been autovacuumed since the DB started on
+2026-01-27** — the worker's own perpetual transactions blocked vacuum
+for 172 days. It had bloated to 215 MB holding only ~300 live rows, and
+the worker had to grind through it every cycle on a heavily
+IO-throttled instance. Cleared it with a `TRUNCATE` delivered via a
+temporary cron job that waited in the lock queue (with
+`statement_timeout = 0` — cron sessions carry a 2-min timeout that was
+killing the waiters) and fired the moment the worker's cycle ended:
+215 MB → 32 kB. After that, the full delivery chain demonstrably
+worked again — crons fired, pg_net delivered, edge functions booted and
+executed for the first time since **16:25 UTC** (the true stall start,
+much earlier than first thought).
+
+**Remaining blocker:** the months of grinding exhausted the instance's
+burst disk-IO budget. Edge functions now run but their database reads
+time out (resolve_articles 500s, analyze_photo "photo not found" after
+15s = its SELECT timing out); even the cron launcher struggles to
+record runs. Nothing more can be fixed from the client side.
+**Owner action needed: Supabase dashboard → Settings → General →
+Restart project** (~1 min downtime, releases everything, typically
+restores performance immediately). If sluggishness recurs after
+restart, the durable fix is a compute upgrade (paid; owner decision) —
+the project runs 8 cron jobs and hundreds of edge-function calls a day
+on the smallest tier.
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
