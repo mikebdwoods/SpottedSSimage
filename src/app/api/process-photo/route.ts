@@ -153,12 +153,13 @@ export async function POST(req: NextRequest) {
 
   let imageBase64: string;
   let mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  let photoStatus: string | null = null;
 
   try {
     // Fetch the photo record
     const { data: photo, error: photoError } = await supabase
       .from("photos")
-      .select("image_url")
+      .select("image_url, status")
       .eq("id", photo_id)
       .single();
 
@@ -166,6 +167,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`Photo not found: ${photoError?.message}`);
     }
 
+    photoStatus = photo.status;
     const imageUrl = photo.image_url;
     if (!imageUrl) throw new Error("Photo has no image URL");
 
@@ -251,10 +253,12 @@ export async function POST(req: NextRequest) {
         ? `No clearly visible outfit in this image (${provider})`
         : `Identified ${items.length} item${items.length === 1 ? "" : "s"} via ${provider}`;
 
-    await supabase
-      .from("photos")
-      .update({ ai_status: "done", ai_summary: summary })
-      .eq("id", photo_id);
+    // Auto-publish: a real outfit was found and nobody has already hidden
+    // this photo - go straight live instead of waiting on manual review.
+    const update: Record<string, unknown> = { ai_status: "done", ai_summary: summary };
+    if (items.length > 0 && photoStatus === "queued") update.status = "live";
+
+    await supabase.from("photos").update(update).eq("id", photo_id);
 
     return NextResponse.json({ success: true, provider, items_found: items.length });
   } catch (err) {

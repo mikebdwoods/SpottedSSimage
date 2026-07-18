@@ -28,7 +28,14 @@ Deno.serve(async (req) => {
       const ogImage = text.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
       const ogTitle = text.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1];
       const title = ogTitle ?? text.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
-      const priceMatch = text.match(/"?price"?\s*[:=]\s*"?£?([0-9]+(?:\.[0-9]{2})?)/i);
+      // Prefer structured price meta (og:price:amount, itemprop=price, JSON-LD
+      // "priceCurrency"-adjacent) over a bare "price" grep, which false-matches
+      // on unrelated numbers like delivery cost mentions.
+      const priceMatch =
+        text.match(/<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i) ??
+        text.match(/itemprop=["']price["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i) ??
+        text.match(/"priceCurrency"\s*:\s*"GBP"\s*,\s*"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)/i) ??
+        text.match(/"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)"?\s*,\s*"priceCurrency"\s*:\s*"GBP"/i);
       return { url, status: res.status, ogImage, title, price: priceMatch?.[1] };
     } catch (err) {
       return { url, error: err instanceof Error ? err.message : String(err) };

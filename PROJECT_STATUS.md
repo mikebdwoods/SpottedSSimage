@@ -4,20 +4,23 @@ Snapshot date: **2026-07-18**. This file is the source of truth for "what's
 built" vs "what's still broken/missing." Update it whenever a major piece
 ships or a new issue is found — don't let it drift like the last one did.
 
-## Current database snapshot (live, updated 2026-07-18 evening)
+## Current database snapshot (live, updated 2026-07-18 late evening)
 
 | Metric | Value |
 |---|---|
-| Photos (total) | 194 — 22 `live`, 172 `queued`; 23 `ai_status=done`, 171 `pending` |
+| Photos (total) | 924 — 98 `live` (auto-published), 826 `queued`; 99 `ai_status=done`, 821 `pending`, 4 `error` |
 | Celebrities | 42 total, 6 published |
-| Clothing items | 108 |
-| Item matches | 20 |
-| Products (catalog) | 11 (6 generic seed + 5 real END. products) |
-| External posts (news feed) | 7,425 — 190 now imported into photos (was 0 this morning) |
+| Clothing items | 445 |
+| Item matches | 256 |
+| Products (catalog) | 16 (6 generic seed + 10 real: 5 END., 3 Missoma, 2 Uniqlo) |
+| External posts (news feed) | 7,425 — resolver still working through the backlog |
 | Celebrity brand affinity rows | 375 |
 
-(This morning's snapshot was 5 photos / 26 items / 6 products / 0 imported —
-the pipeline fixes shipped today changed all of this substantially.)
+Growth since this morning (5 photos / 26 items / 6 products / 0 imported)
+is the resolver + auto-import + auto-publish pipeline running
+continuously, not manual work — it will keep growing on its own via the
+5-min resolve cron and hourly AI/match cron. Photo counts in this table
+will already be stale by the time you read this.
 
 The two numbers that matter most right now: **only 5 real photos exist**,
 and **none of the 7,425 scraped news posts have been imported yet**. Almost
@@ -174,7 +177,23 @@ branding off a jacket, "brat" merch text off a top).
 
 ## What still needs addressing
 
-### 0. ~~Looks not appearing despite "In the news" showing real photos~~ — FIXED (2026-07-18 evening)
+### -1. Photos now auto-publish (2026-07-18 late evening) — supersedes issue 0 below
+User explicitly asked for the manual-publish gate to go: "I want the
+photos to automatically publish." Changed `analyze_photo` (edge function)
+and `/api/process-photo` (Next.js route, kept in sync) so that once AI
+finds a real outfit (`items.length > 0`) on a photo that's still
+`status='queued'`, it goes straight to `status='live'` in the same
+update as `ai_status='done'`. A photo where Gemini found nothing stays
+`queued` — never publishes an empty look page. A photo an admin has
+explicitly `hidden` is never touched (only auto-publishes from
+`queued`), so manual moderation still works, it's just no longer a
+required step for normal flow. One-time catch-up: published the 76
+photos that were already `done` with real items but stuck `queued`.
+Going forward this is fully automatic — the admin "Photos" page is now
+for moderation/curation (hide something wrong) rather than a required
+publish gate.
+
+### 0. ~~Looks not appearing despite "In the news" showing real photos~~ — FIXED (2026-07-18 evening, now superseded by auto-publish above)
 Not a pipeline bug — the auto-import from issue 1/3 below was working
 correctly, but every photo it creates lands as `status='queued'`
 (intentional editorial gate, admin must publish). Nobody had published
@@ -238,9 +257,9 @@ earlier only treated the symptom.
   posts already resolved before this existed were backfilled the same
   way in one pass.
 
-**Remaining verification:** watch `/admin/photos` over the next few hours
-as the 81 backfilled + ongoing resolved photos get AI-tagged, then
-publish a batch and confirm they render correctly on the public site.
+**Superseded by auto-publish (issue -1 above):** no manual publish batch
+needed anymore — resolved/AI-tagged photos with a real outfit go live on
+their own.
 
 ### 2. Product catalog is thin — shopping links are still limited
 Started at only 6 generic seed products against dozens of real
@@ -281,15 +300,68 @@ real C.P. Company jacket itself (`match_type: exact`, `score: 0.83`),
 correctly outranking the old ZARA/Gucci fallbacks which remain as lower
 `similar` options rather than being deleted.
 
-Catalog is still thin relative to the ~108 `clothing_items` now in the
-system (most categories — dresses, jeans, jewellery, trousers, tops —
-still have zero real products). Two ways to grow it further:
-(a) get Awin retailer programmes approved, which unlocks structured
-feed data instead of scraping; (b) keep sourcing via END. + other
-scraping-friendly sites/brand-direct stores. The diagnostic function
-`supabase/functions/awin_test` now doubles as a URL-verification tool
-(`fetch_urls` array in its POST body) for this — safe to delete once a
-proper `sync_products` function exists.
+**Round 2 (2026-07-18 late evening) — the real scale of the gap.** The AI
+pipeline had been running for hours in the background and
+`clothing_items` had grown from ~108 to **445**, dominated by
+`jewellery` (118), `top` (82), `other` (60, mostly non-fashion —
+tambourines, phone cases, headphones — not realistically shoppable and
+deprioritised), `dress` (49), `jacket` (45). The catalog had zero
+jewellery products despite it being by far the largest category, which
+is why the user saw "0 matches" everywhere, not just on the C.P.
+Company jacket.
+
+Sourced and verified 5 more real products, expanding past END. (which
+is streetwear/menswear-leaning, weak on jewellery/dresses) to other
+sites confirmed *not* to block automated fetching:
+- **Missoma** (UK jewellery brand): Classic Small Hoop Earrings 18ct
+  Gold Plated £98, Ancien Ring Sterling Silver £115, Classic Snake
+  Chain Necklace Silver £105
+- **Uniqlo**: two basic crew-neck tees (black, white) — price couldn't
+  be reliably extracted from their page structure, so `price = NULL`
+  rather than guessed; the item page already handles this ("See price"
+  fallback), so it's an honest real product rather than a fabricated
+  price.
+
+Catalog is now 16 products (was 6 this morning). Cleared and
+re-ran `match_products` across ~150 of the ~400 then-unmatched items
+(the hourly `match-products-hourly` cron — 30/batch — is still working
+through the rest and will keep doing so automatically). **Verified
+fixed**: the exact "Hat, navy" item from the user's second screenshot
+(Dua Lipa) now matches to the real Adsum bucket hat instead of showing
+"No matches yet."
+
+**Honest assessment of what's actually needed, since "think long and
+hard" was the ask:** matching quality is fundamentally bounded by
+catalog size, and catalog size is bounded by how many products can be
+verified as real before insertion. Three retailer families now proven
+scrapeable (END., Missoma, Uniqlo), plus C.P. Company's own site
+(product pages only, not category listings) — each one sourced by
+hand: search for a specific real product → fetch it through
+`awin_test`'s `fetch_urls` batch mode → confirm price/image → insert.
+That's maybe 5-10 products per sourcing session at the current
+by-hand pace. Getting meaningful coverage across `dress` (49, zero
+coverage), `skirt` (10), `bag` (10), `trousers` (7), `scarf` (7),
+`belt` (6), `shoes` (6), `jeans` (3) — none of which have a single
+product yet — needs several more rounds like this one, ideally
+targeted at retailers that carry that specific category well (e.g.
+Whistles/Reiss/& Other Stories for dresses, not tested yet).
+
+This does not scale to hundreds of SKUs by hand. The two real paths
+forward, not mutually exclusive:
+1. **Get Awin retailer programmes approved** (still zero joined as of
+   this writing) — unlocks structured bulk feed data instead of
+   one-URL-at-a-time scraping. This is the only path that reaches
+   thousands of real SKUs; scraping tops out at dozens.
+   2. **Keep doing manual sourcing rounds** targeting the highest-volume
+   uncovered categories first (dress, top remainder, bag) — viable as a
+   stopgap, proven to work, but linear effort for linear catalog growth.
+
+Also known but not urgent: `process_unmatched_items_batch()` re-selects
+items that got zero matches on a prior attempt (nothing marks a "tried,
+found nothing" state), so items in totally-uncovered categories get
+retried every cron cycle for no benefit until that category gets real
+product coverage. Harmless (just wasted cron cycles), not fixed this
+round.
 
 Also partially mitigated: the misleading "Top pick" badge (previously
 applied to any category-only match regardless of relevance) is now
@@ -307,9 +379,8 @@ publish remains the gate before anything goes public.
 ### 4. Only 6 of 42 celebrities are published
 36 celebrity records exist but aren't publicly visible. Worth reviewing
 whether that's intentional (incomplete profiles) or just backlog. Note:
-now that resolve_articles auto-imports (issue 1/3), publishing more
-celebrities will surface a lot of queued-but-unpublished looks fairly
-fast (e.g. Dua Lipa already has 66 auto-imported photos, 0 published).
+publishing more celebrities now surfaces looks fast — photos auto-publish
+once AI finds a real outfit (issue -1), no manual step needed.
 
 ### 7. ~~`/celebrities` directory showed a "looks" count that included unpublished photos~~ — FIXED (2026-07-18)
 The count on `/celebrities` used `photos(count)` with no status filter,
