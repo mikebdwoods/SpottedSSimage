@@ -4,7 +4,7 @@ Snapshot date: **2026-07-18**. This file is the source of truth for "what's
 built" vs "what's still broken/missing." Update it whenever a major piece
 ships or a new issue is found — don't let it drift like the last one did.
 
-## Current database snapshot (live, updated 2026-07-18 ~14:40 UTC)
+## Current database snapshot (live, updated 2026-07-18 ~14:40 UTC — ⚠️ pipeline has been stalled since ~19:50 UTC, see roadmap item 0; numbers below stopped moving around 21:15 UTC)
 
 | Metric | Value |
 |---|---|
@@ -25,7 +25,39 @@ day at 5 photos / 26 items / 6 products.
 
 ## What's next — prioritized roadmap (written 2026-07-18)
 
-In priority order, with reasoning. Items 1 is done; the rest are open.
+In priority order, with reasoning. Items 0-2 are done; the rest are open.
+
+### 0. 🚨 Active infra incident — pg_cron jobs failing project-wide ("job startup timeout") — OPEN, discovered 2026-07-18 ~21:15 UTC
+Every single cron job on the project (`resolve-articles-every-5min`,
+`analyze-photos-every-10min`, `match-products-every-15min`,
+`source-products-every-20min`, `ingest-queue-every-30min`,
+`process-ingest-queue`) has been failing back-to-back with
+`return_message: "job startup timeout"` continuously since at least
+19:50 UTC (checked as far back as that; may have started earlier) —
+confirmed still failing as of 21:30 UTC, over 90 minutes. **The entire
+automated pipeline is stalled**: zero new photos created since 21:15:51
+UTC despite ~5,000 unresolved posts in the backlog.
+
+Investigated: not a code issue (started well before today's
+`resolve_articles` v5 deploy, and hits every job type equally, not just
+one function). Not connection-pool exhaustion (`pg_stat_activity` shows
+only ~22 connections, nowhere near a limit). `net.http_request_queue` is
+empty (not a backed-up pg_net queue). Postgres logs show a cluster of
+`"canceling statement due to statement timeout"` errors around the same
+window. Likely candidate: `max_worker_processes = 6` /
+`max_parallel_workers = 2` — pg_cron's dynamic per-job background
+workers share that same small pool with autovacuum, logical
+replication, and the `pg_net` worker, and `cron.max_running_jobs = 32`
+implies far more concurrency headroom than 6 worker-process slots can
+actually provide. This looks like a Supabase-platform-level resource
+ceiling for this project's compute tier, not something fixable via SQL
+from the client side (no invasive fix — e.g. restarting/pausing the
+project — was attempted; that's a call for the project owner, not
+something to do unilaterally on live production infra).
+
+**Next step: needs Supabase support/dashboard investigation, or simply
+monitoring to see if it self-clears.** Until it does, the pipeline is
+effectively paused — nothing downstream of this is going to move.
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
@@ -35,16 +67,42 @@ capacity) replaces `analyze-photos-hourly`; `match-products-every-15min`
 (2,880 items/day) replaces `match-products-hourly`. Backlog should clear
 in under a day; capacity now comfortably exceeds inflow.
 
-### 2. Duplicate-look collapse (biggest visible quality problem next)
+### 2. ~~Duplicate-look collapse~~ — DONE (2026-07-18)
 Multiple outlets syndicate the same agency photo, and the resolver
-imports each article separately — so a celebrity's page will show
+imported each article separately — so a celebrity's page would show
 near-identical looks several times (e.g. several Dua Lipa honeymoon
-posts using the same paparazzi set). Options, in increasing effort:
-exact `image_url` dedupe at import (cheap, catches some), image
-content-hash dedupe (download + perceptual hash at import, catches
-syndication with different CDN URLs), or grouping near-duplicate photos
-into a single look. Recommend starting with a hash-at-import check plus
-a one-off cleanup pass over existing photos.
+posts using the same paparazzi set). Root cause: `resolve_articles`
+only deduped on exact `source_post_url` (the article link), never on
+the underlying image — different articles about the same event each
+created their own `photos` row.
+
+**Two-part fix:**
+- One-time cleanup migration (`dedupe_duplicate_photo_images`, applied
+  directly): found 54 duplicate `(celeb_id, image_url)` groups (137
+  rows total, 83 "excess"), 22 of which were already `live` on the
+  public site. For each group, kept the photo with the richest AI
+  result (most `clothing_items`), tie-broken by already-`live` status
+  then earliest `created_at` — deliberately prioritising AI-result
+  quality over which duplicate happened to be live first, promoting a
+  better `queued` duplicate to `live` if needed so the group never lost
+  public visibility. Repointed `external_posts.photo_id` to the keeper,
+  deleted the rest. Verified: 0 duplicate groups remaining post-migration.
+- Prevention fix in `resolve_articles` (deployed as v5, 21:15:51 UTC):
+  before inserting a new photo, now also checks for an existing photo
+  with the same `(celeb_id, image_url)`, not just the same
+  `source_post_url`, and reuses it instead of creating a duplicate.
+
+**Verification caveat**: live-traffic confirmation is incomplete because
+of the infra incident (item 0) — cron runs since the v5 deploy have all
+failed to start, so there's been no real opportunity yet to observe v5
+processing a genuine syndicated-photo case in production. What *is*
+confirmed: every duplicate group found after the deploy has
+`created_at` timestamps that predate 21:15:51 UTC (created by the old
+code during the gap between the cleanup migration and the v5 deploy),
+and zero new photos of any kind have been created since — consistent
+with the fix being correct and simply not yet exercised, not with it
+being broken. Re-check once item 0 clears and the resolver is running
+again.
 
 ### 3. Publish more celebrities (instant breadth, near-zero work)
 Only 6 of 42 celebrities are published, but the pipeline is importing
@@ -503,6 +561,17 @@ most categories. The `source_products` automation (see issue 2's
 2026-07-18 night update) now fills exactly this gap continuously —
 verified live producing a real Pandora ring match for a jewellery item
 that previously had none.
+
+### 8. ~~Duplicate looks from syndicated photos~~ — FIXED (2026-07-18), see roadmap #2 for full writeup
+Same-image duplicates across multiple `photos` rows for one celebrity,
+caused by `resolve_articles` deduping only on `source_post_url` and not
+on the image itself. One-time cleanup migration collapsed 54 groups
+(137 rows); prevention fix deployed in `resolve_articles` v5.
+
+### 9. Discovered mid-session: project-wide pg_cron outage ("job startup timeout") — OPEN, tracked as roadmap #0
+While verifying the above fix, found every cron job on the project has
+been failing to start for 90+ minutes, unrelated to any code change.
+See roadmap #0 for full investigation notes.
 
 ### 6. Minor: a "News Feed" placeholder occupies a `celebrities` row — STILL OPEN, tracked as roadmap #7
 One of the 42 `celebrities` rows (slug `news-feed`) isn't a real
