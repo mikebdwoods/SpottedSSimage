@@ -172,10 +172,11 @@ Deno.serve(async (req) => {
   }
 
   // Unresolved = no resolve_status yet, still a Google News link, not yet imported.
-  // Newest first: those are the posts an admin is most likely to import.
+  // Newest first: those are the posts most worth surfacing quickly.
+  const SELECT_FIELDS = "id, link, image_url, title, celeb_id, published_at, source_name";
   let query = supabase
     .from("external_posts")
-    .select("id, link, image_url")
+    .select(SELECT_FIELDS)
     .is("resolve_status", null)
     .like("link", "%news.google.com%")
     .is("photo_id", null)
@@ -183,11 +184,7 @@ Deno.serve(async (req) => {
     .limit(batchSize);
 
   if (postIds) {
-    query = supabase
-      .from("external_posts")
-      .select("id, link, image_url")
-      .in("id", postIds)
-      .limit(50);
+    query = supabase.from("external_posts").select(SELECT_FIELDS).in("id", postIds).limit(50);
   }
 
   const { data: posts, error } = await query;
@@ -218,7 +215,50 @@ Deno.serve(async (req) => {
           })
           .eq("id", post.id);
         resolved++;
-        results.push({ id: post.id, publisher_url: publisherUrl, image });
+
+        // Auto-load into the Looks pipeline: a queued photo + AI clothing
+        // ID, same as a manual Feed Inbox import. Still gated behind admin
+        // publish (status stays 'queued') before it ever goes public.
+        let photoId: string | null = null;
+        if (post.celeb_id) {
+          const { data: dupe } = await supabase
+            .from("photos")
+            .select("id")
+            .eq("source_post_url", post.link)
+            .limit(1)
+            .maybeSingle();
+
+          if (!dupe) {
+            const { data: photo } = await supabase
+              .from("photos")
+              .insert({
+                celeb_id: post.celeb_id,
+                image_url: image,
+                headline: post.title,
+                source_url: publisherUrl,
+                source_post_url: post.link,
+                source_type: "feed",
+                ingestion_source: post.source_name,
+                taken_at: post.published_at,
+                status: "queued",
+                ai_status: "pending",
+              })
+              .select("id")
+              .single();
+            photoId = photo?.id ?? null;
+          } else {
+            photoId = dupe.id;
+          }
+
+          if (photoId) {
+            await supabase.from("external_posts").update({ photo_id: photoId }).eq("id", post.id);
+            // AI runs via the existing hourly analyze-photos-hourly cron
+            // (20/batch, rate-limit aware) rather than firing here — this
+            // function can create far more photos per run than that budget.
+          }
+        }
+
+        results.push({ id: post.id, publisher_url: publisherUrl, image, photo_id: photoId });
       } else {
         // Real article found but no usable image — keep publisher_url, flag it
         await supabase

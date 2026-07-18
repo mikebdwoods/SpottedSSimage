@@ -200,29 +200,45 @@ earlier only treated the symptom.
 - Import actions hard-refuse any post whose image host is
   `lh3.googleusercontent.com` / `news.google.com` / `gstatic.com`, so a
   placeholder can never become a photo again.
+- **`resolve_articles` now auto-loads every successfully resolved post
+  straight into the Looks pipeline** (`photos`, `status='queued'`,
+  `ai_status='pending'`) instead of waiting for a manual Feed Inbox
+  click — admin publish is still the gate before anything goes public.
+  AI runs via the existing hourly cron (20/batch) rather than firing
+  immediately, so a 25-post resolve batch doesn't burst Gemini. The 81
+  posts already resolved before this existed were backfilled the same
+  way in one pass.
 
-**Remaining verification:** once the backlog resolves, import a batch via
-`/admin/feed` and confirm real photos flow end-to-end (import → AI →
-publish → public site). If the user still sees icon placeholders on the
-live site after this, that's browser/CDN cache of the old (deleted)
-pages — the DB contains no icon photos at all.
+**Remaining verification:** watch `/admin/photos` over the next few hours
+as the 81 backfilled + ongoing resolved photos get AI-tagged, then
+publish a batch and confirm they render correctly on the public site.
 
 ### 2. Product catalog is empty — shopping links are barely meaningful
-Only 6 seed products exist in `products` against 26 real `clothing_items`,
-yielding 16 `item_matches`. That's not enough real inventory for the
+Only 6 seed products exist in `products` against 26 real `clothing_items`.
+Confirmed live and user-reported: a Liam Gallagher jacket correctly
+AI-read as "C.P. Company" got matched to a ZARA "Leather Effect Jacket"
+and a Gucci "Leather Biker Jacket" — the only two jacket-shaped products
+in the entire catalog — because there's no C.P. Company product to match
+and nothing closer available. That's not enough real inventory for the
 "shop the look" feature to deliver real value. Needs a real product
 catalog — either a retailer feed/API integration or manual curation — to
 make match quality meaningful at scale.
 
-### 3. Feed Inbox has never been used to import real content
-7,425 external posts have been scraped via RSS, but **0 have been
-imported into `photos`**. Until 2026-07-18 this was actually impossible
-to do usefully — imports could only produce Google News icons (see
-issue 1). Now that article resolution is live, importing a batch via
-`/admin/feed` once the backlog resolves is the highest-leverage step for
-actually populating the site. The pipeline downstream of import
-(AI tagging, product matching, publishing) has so far only been proven
-against 5 hand-verified photos.
+Partially mitigated 2026-07-18: the misleading "Top pick" badge (which
+was applied to that Gucci jacket despite it sharing nothing but category
+with the real garment) is now gated on match score, so a bare
+category-only match no longer gets badged as a confident recommendation
+— see `CONFIDENT_MATCH_SCORE` in the item page. The underlying gap
+(nothing genuinely close to match against) still needs a real catalog.
+
+### 3. ~~Feed Inbox has never been used to import real content~~ — FIXED (2026-07-18)
+7,425 external posts have been scraped via RSS but, until issue 1 was
+fixed, importing them could only ever produce Google News icons — so
+nothing had been imported. Now `resolve_articles` auto-imports every
+resolved post into `photos` (see issue 1). 81 photos already created
+this way, AI-tagging in progress via the hourly cron; thousands more
+will follow as the resolve backlog clears over the next ~24h. Admin
+publish remains the gate before anything goes public.
 
 ### 4. Only 6 of 42 celebrities are published
 36 celebrity records exist but aren't publicly visible. Worth reviewing
