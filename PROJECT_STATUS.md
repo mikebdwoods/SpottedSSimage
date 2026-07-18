@@ -69,17 +69,22 @@ Next.js 15 App Router, deployed on Vercel from `main` (auto-deploy on push).
 ```
 Google News RSS ──(cron: every 2h, "rss-ingest-every-2-hours")──▶ external_posts (7,425 posts)
        │
-       ▼  admin imports the good ones via /admin/feed (bulk or single)
-    photos (status: queued, ai_status: pending)
+       ▼  cron: every 5 min ("resolve-articles-every-5min") — decode link, scrape real
+       │  article photo, auto-import into photos (status: queued, ai_status: pending)
        │
        ▼  cron: hourly at :05 ("analyze-photos-hourly") — analyze_photo edge function
     clothing_items (category, color, brand_guess, description)
+       │  photo AUTO-PUBLISHES (status → live) when a real outfit is found
+       │
+       ├──▼  cron: every 20 min ("source-products-every-20min") — source_products
+       │   Gemini grounded-search finds real UK listings per item; each candidate
+       │   URL is fetched + verified (direct, then Jina Reader proxy for
+       │   bot-walled retailers) before insertion into products
        │
        ▼  cron: hourly at :15 ("match-products-hourly") — match_products edge function
     item_matches ──▶ products (shoppable links, price tiers)
        │
-       ▼  admin publishes via /admin/photos (single or batch)
-    Public site (status → live)
+       ▼  Public site — admin panel is now for moderation (hide), not publishing
 ```
 
 Active cron jobs (verified in `cron.job`, 2026-07-18):
@@ -92,6 +97,7 @@ Active cron jobs (verified in `cron.job`, 2026-07-18):
 | `match-products-hourly` | `15 * * * *` |
 | `resolve-articles-every-5min` (added 2026-07-18) | `*/5 * * * *` |
 | `refresh-observed-brand-affinity-6h` (added 2026-07-18) | `20 */6 * * *` |
+| `source-products-every-20min` (added 2026-07-18) | `*/20 * * * *` |
 
 ### AI vision pipeline (`analyze_photo` Supabase edge function + `/api/process-photo` Next.js route)
 
@@ -346,15 +352,50 @@ product yet — needs several more rounds like this one, ideally
 targeted at retailers that carry that specific category well (e.g.
 Whistles/Reiss/& Other Stories for dresses, not tested yet).
 
-This does not scale to hundreds of SKUs by hand. The two real paths
-forward, not mutually exclusive:
-1. **Get Awin retailer programmes approved** (still zero joined as of
-   this writing) — unlocks structured bulk feed data instead of
-   one-URL-at-a-time scraping. This is the only path that reaches
-   thousands of real SKUs; scraping tops out at dozens.
-   2. **Keep doing manual sourcing rounds** targeting the highest-volume
-   uncovered categories first (dress, top remainder, bag) — viable as a
-   stopgap, proven to work, but linear effort for linear catalog growth.
+**SUPERSEDED (2026-07-18 night): sourcing is now fully automated.**
+New `source_products` edge function + `source-products-every-20min`
+cron. Per clothing item it: (1) asks Gemini with **Google Search
+grounding** (`tools: [{google_search:{}}]`, works on the existing
+`GEMINI_API_KEY`) for up to 3 real UK product listings matching the
+item's AI description, preferring known-scrapeable retailers;
+(2) **verifies every candidate URL** before insertion — direct fetch
+with og:title/og:image/structured-price extraction first, then the
+**Jina Reader proxy (`r.jina.ai/<url>`)** as fallback, which was
+confirmed live to defeat the retailer bot-walls that blocked us (an
+ASOS product page returned its real title through Jina after
+hard-blocking direct fetches); (3) inserts only verified products,
+fires `match_products` for the item immediately, and marks the item
+`sourced`/`no_source`/`error` (`clothing_items.sourcing_status` +
+`sourcing_attempted_at`) so each item costs exactly one Gemini call
+ever — the backlog (~380 shoppable items) drains in ~1.5 days at
+4 items/20min, then the cron runs as a cheap no-op on empty batches,
+picking up only newly AI-tagged items.
+
+Verified live before scheduling: first batch sourced a real Pandora
+"Square Sparkle Halo Ring, Sterling silver, £69" (page-verified price
++ real Pandora CDN image) for a silver-rings jewellery item — the
+biggest zero-coverage category. Also caught + fixed in testing: END.
+serves soft-404s ("This page could not be found") with HTTP 200, so
+the verification bad-title guard was widened; the one bad row it let
+through was deleted and its item re-queued. Jina markdown parsing
+skips cookie-banner/consent imagery and prefers retailer-hosted
+images; markdown-extracted prices are distrusted entirely (candidate
+falls back to the search-grounded price or NULL — never a guess).
+
+Cost note: each attempted item = 1 grounded Gemini call. Grounded
+search is billed by Google beyond the free daily allowance — worst
+case a few hundred calls/day while the backlog drains, then a trickle.
+One-time-per-item semantics cap total spend at roughly the number of
+shoppable clothing items.
+
+Still-valid longer-term paths (complementary, not required now):
+1. **Awin retailer programmes** (still zero joined) — structured bulk
+   feeds + affiliate revenue; the only route to thousands of SKUs and
+   commission.
+2. **Bulk sitemap ingestion** of proven-scrapeable retailers (END.,
+   Missoma, Uniqlo publish full product sitemaps) — thousands of real
+   SKUs with zero AI spend; worth building if grounded-search hit
+   rates disappoint.
 
 Also known but not urgent: `process_unmatched_items_batch()` re-selects
 items that got zero matches on a prior attempt (nothing marks a "tried,
