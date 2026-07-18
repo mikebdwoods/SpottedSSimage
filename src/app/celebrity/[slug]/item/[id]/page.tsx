@@ -195,6 +195,14 @@ export default async function ClothingItemPage({
                   {item.brand_guess}
                 </span>
               )}
+              {!item.brand_guess && item.inferred_brand && (
+                <span
+                  className="border border-dashed rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"
+                  title={`No visible brand markings — likely brand based on ${celeb.name}'s known style`}
+                >
+                  Possibly {item.inferred_brand}
+                </span>
+              )}
             </div>
           </div>
 
@@ -258,7 +266,15 @@ export default async function ClothingItemPage({
                                   Exact match
                                 </div>
                               )}
-                              {match.is_primary && match.match_type !== "exact" && (
+                              {match.match_type === "celebrity_style_guess" && (
+                                <div
+                                  className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed"
+                                  title={`No visible brand markings — suggested based on ${celeb.name}'s known style`}
+                                >
+                                  Style guess
+                                </div>
+                              )}
+                              {match.is_primary && match.match_type !== "exact" && match.match_type !== "celebrity_style_guess" && (
                                 <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
                                   Top pick
                                 </div>

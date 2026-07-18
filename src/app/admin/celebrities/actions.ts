@@ -22,6 +22,21 @@ async function requireAdmin() {
   return supabase;
 }
 
+// Fire-and-forget: seeds celebrity_brand_affinity from general knowledge so
+// even a celeb with zero photos has an educated-guess brand fallback for
+// product matching. 'observed' rows build up separately as their photos
+// get AI-tagged (refresh_observed_brand_affinity).
+function fireBuildBrandProfile(celebId: string) {
+  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!baseUrl) return;
+
+  fetch(`${baseUrl}/functions/v1/build_brand_profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ celeb_id: celebId }),
+  }).catch(() => {});
+}
+
 export async function addCelebrity(formData: FormData) {
   const supabase = await requireAdmin();
 
@@ -47,16 +62,28 @@ export async function addCelebrity(formData: FormData) {
 
   const slug = slugify(name);
 
-  await supabase.from("celebrities").insert({
-    name,
-    slug,
-    bio: bio || null,
-    photo_url: imageUrl,
-    status: "published",
-  });
+  const { data: celeb } = await supabase
+    .from("celebrities")
+    .insert({
+      name,
+      slug,
+      bio: bio || null,
+      photo_url: imageUrl,
+      status: "published",
+    })
+    .select("id")
+    .single();
+
+  if (celeb) fireBuildBrandProfile(celeb.id);
 
   revalidatePath("/admin/celebrities");
   revalidatePath("/");
+}
+
+export async function rebuildBrandProfile(celebId: string) {
+  await requireAdmin();
+  fireBuildBrandProfile(celebId);
+  revalidatePath(`/admin/celebrities/${celebId}`);
 }
 
 export async function updateCelebrity(id: string, formData: FormData) {

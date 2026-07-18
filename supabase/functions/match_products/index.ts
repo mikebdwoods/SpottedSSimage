@@ -53,11 +53,39 @@ serve(async (req) => {
 
     const { data: item, error: itemError } = await supabase
       .from("clothing_items")
-      .select("id, category, brand_guess, color, description")
+      .select("id, category, brand_guess, color, description, photo_id, photos(celeb_id)")
       .eq("id", item_id)
       .single();
 
     if (itemError || !item) return json({ error: "Item not found" }, 404);
+
+    // No visible brand markings — fall back to an educated guess from what
+    // this celebrity is known to wear, rather than leaving brand blank.
+    let inferredBrand: string | null = null;
+    let inferredConfidence: number | null = null;
+    const celebId = (item.photos as unknown as { celeb_id: string } | null)?.celeb_id;
+    if (!item.brand_guess && celebId) {
+      let affinityQuery = supabase
+        .from("celebrity_brand_affinity")
+        .select("brand, confidence, category")
+        .eq("celeb_id", celebId);
+      affinityQuery = item.category
+        ? affinityQuery.or(`category.eq.${item.category},category.is.null`)
+        : affinityQuery.is("category", null);
+      const { data: affinity } = await affinityQuery
+        .order("confidence", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (affinity) {
+        inferredBrand = affinity.brand;
+        inferredConfidence = affinity.confidence;
+        await supabase
+          .from("clothing_items")
+          .update({ inferred_brand: inferredBrand, inferred_brand_confidence: inferredConfidence })
+          .eq("id", item_id);
+      }
+    }
 
     // Skip if the item already has matches (idempotent for cron re-runs)
     const { count: existing } = await supabase
@@ -75,6 +103,7 @@ serve(async (req) => {
 
     const categoryTerms = CATEGORY_SYNONYMS[item.category ?? ""] ?? (item.category ? [item.category] : []);
     const brand = (item.brand_guess ?? "").toLowerCase().trim();
+    const guessBrand = (inferredBrand ?? "").toLowerCase().trim();
     const color = (item.color ?? "").toLowerCase().trim();
 
     const scored = (products ?? [])
@@ -83,25 +112,30 @@ serve(async (req) => {
         const pBrand = (p.brand ?? "").toLowerCase();
         const categoryHit = categoryTerms.some((t) => title.includes(t));
         const brandHit = !!brand && (pBrand.includes(brand) || title.includes(brand));
+        // Only consider the celebrity-style guess when there's no real
+        // brand_guess to begin with - it's a fallback, not a competitor.
+        const guessHit = !brandHit && !!guessBrand && (pBrand.includes(guessBrand) || title.includes(guessBrand));
         const colorHit = !!color && title.includes(color);
 
         let score = 0;
         if (categoryHit) score += 2;
         if (brandHit) score += 3;
+        if (guessHit) score += 1.5 * (inferredConfidence ?? 0.5);
         if (colorHit) score += 1;
 
-        return { product: p, score, categoryHit, brandHit };
+        return { product: p, score, categoryHit, brandHit, guessHit };
       })
-      // Require at least a category or brand connection - never match on
-      // colour alone, and never match everything when fields are null.
-      .filter((s) => s.categoryHit || s.brandHit)
+      // Require at least a category, brand, or celebrity-style-guess
+      // connection - never match on colour alone.
+      .filter((s) => s.categoryHit || s.brandHit || s.guessHit)
       .sort((a, b) => b.score - a.score)
       .slice(0, 4);
 
     const createdMatches: string[] = [];
     for (let i = 0; i < scored.length; i++) {
-      const { product, score, categoryHit, brandHit } = scored[i];
-      const matchType = brandHit && categoryHit ? "exact" : brandHit ? "same_brand" : "similar";
+      const { product, score, categoryHit, brandHit, guessHit } = scored[i];
+      const matchType =
+        brandHit && categoryHit ? "exact" : brandHit ? "same_brand" : guessHit ? "celebrity_style_guess" : "similar";
       const { data: match } = await supabase
         .from("item_matches")
         .insert({
@@ -116,7 +150,12 @@ serve(async (req) => {
       if (match) createdMatches.push(match.id);
     }
 
-    return json({ success: true, item_id, matches_created: createdMatches.length });
+    return json({
+      success: true,
+      item_id,
+      matches_created: createdMatches.length,
+      inferred_brand: inferredBrand,
+    });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[match_products] Error:", msg);
