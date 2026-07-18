@@ -37,11 +37,14 @@ Google News RSS ──(cron: every 2h)──▶ external_posts (7,400+ posts)
     Public site
 ```
 
-- **`analyze_photo`** (Supabase edge function): downloads the photo, sends it to
-  Claude (`claude-sonnet-4-6`), parses identified clothing into `clothing_items`.
-  Self-healing: billing/rate-limit/API errors return the photo to `pending`
-  for automatic retry. Requires the `ANTHROPIC_API_KEY` edge function secret
-  **and API credits** on the Anthropic account.
+- **`analyze_photo`** (Supabase edge function): downloads the photo, sends it
+  to an AI vision model, parses identified clothing into `clothing_items`.
+  Tries **Gemini** (`gemini-2.0-flash`, free tier) first via `GEMINI_API_KEY`;
+  falls back to **Claude** (`claude-sonnet-4-6`) via `ANTHROPIC_API_KEY` if
+  Gemini fails and a Claude key is present. `ai_summary` records which
+  provider produced each result. Self-healing: billing/rate-limit/quota/API
+  errors return the photo to `pending` for automatic retry. With neither key
+  configured, photos stay `pending` — never fabricated placeholder data.
 - **`match_products`**: scores products against each item (category synonyms +
   brand + colour); only creates matches with a genuine connection.
 - Photo statuses: `queued` → (`approved`) → `live` (public) / `hidden`.
@@ -65,9 +68,11 @@ Google News RSS ──(cron: every 2h)──▶ external_posts (7,400+ posts)
 | Vercel | `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + server reads (RLS applies) |
 | Vercel | `SUPABASE_SERVICE_ROLE_KEY` | `/api/process-photo` writes |
 | Vercel | `NEXT_PUBLIC_SITE_URL` | Absolute URLs, OG images, internal API calls |
-| Vercel | `ANTHROPIC_API_KEY` | Instant "Run AI" from admin (optional; cron covers it) |
+| Vercel | `GEMINI_API_KEY` | Instant "Run AI" from admin, free tier via [aistudio.google.com](https://aistudio.google.com) |
+| Vercel | `ANTHROPIC_API_KEY` | Optional upgrade/fallback if Gemini fails |
 | Vercel | `INTERNAL_API_SECRET` | Auth for `/api/process-photo` (any random string) |
-| Supabase edge secrets | `ANTHROPIC_API_KEY` | Hourly cron AI analysis (**required**) |
+| Supabase edge secrets | `GEMINI_API_KEY` | Hourly cron AI analysis — **required** for the pipeline to run |
+| Supabase edge secrets | `ANTHROPIC_API_KEY` | Optional fallback if Gemini fails/hits quota |
 
 ## Development
 
