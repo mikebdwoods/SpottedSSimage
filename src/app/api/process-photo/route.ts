@@ -39,6 +39,18 @@ const VALID_CATEGORIES = new Set([
   "suit","bodysuit","shorts","jumpsuit","hat","belt","scarf","other",
 ]);
 
+// Categories that can appear on their own in a close-up (face, hands,
+// bag-only shot) without any actual outfit being visible. A photo whose
+// AI-identified items are entirely drawn from this set isn't a "look" -
+// it shouldn't auto-publish just because *something* was detected.
+const ACCESSORY_ONLY_CATEGORIES = new Set([
+  "bag", "sunglasses", "jewellery", "hat", "belt", "scarf", "other",
+]);
+
+function hasGenuineClothing(items: ClothingItem[]): boolean {
+  return items.some((i) => !ACCESSORY_ONLY_CATEGORIES.has(i.category));
+}
+
 function normaliseItems(raw: unknown[]): ClothingItem[] {
   return raw
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
@@ -253,10 +265,13 @@ export async function POST(req: NextRequest) {
         ? `No clearly visible outfit in this image (${provider})`
         : `Identified ${items.length} item${items.length === 1 ? "" : "s"} via ${provider}`;
 
-    // Auto-publish: a real outfit was found and nobody has already hidden
-    // this photo - go straight live instead of waiting on manual review.
+    // Auto-publish: a real outfit was found (at least one genuine clothing
+    // item, not just an accessory like sunglasses/jewellery that can show
+    // up in a close-up crop with no outfit visible) and nobody has already
+    // hidden this photo - go straight live instead of waiting on manual
+    // review.
     const update: Record<string, unknown> = { ai_status: "done", ai_summary: summary };
-    if (items.length > 0 && photoStatus === "queued") update.status = "live";
+    if (hasGenuineClothing(items) && photoStatus === "queued") update.status = "live";
 
     await supabase.from("photos").update(update).eq("id", photo_id);
 

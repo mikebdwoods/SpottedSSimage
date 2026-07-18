@@ -562,6 +562,29 @@ most categories. The `source_products` automation (see issue 2's
 verified live producing a real Pandora ring match for a jewellery item
 that previously had none.
 
+### 10. ~~Auto-publish didn't require actual clothing~~ — FIXED (2026-07-18)
+User-requested rule: a photo with no clothes visible (e.g. a close-up of
+a face) should never publish. The auto-publish gate (issue -1 above) was
+checking `items.length > 0`, but the AI's item categories include pure
+accessories — `bag`, `sunglasses`, `jewellery`, `hat`, `belt`, `scarf`,
+`other` — which can appear alone on a close-up crop with no outfit in
+frame at all (earrings + sunglasses on a face shot, say). Such a photo
+passed the old gate and went live with nothing to actually shop.
+
+Fixed in both `analyze_photo` (edge function, deployed v43) and
+`/api/process-photo` (kept in sync per convention): added
+`ACCESSORY_ONLY_CATEGORIES` and a `hasGenuineClothing()` check — a photo
+now only auto-publishes if at least one identified item's category is
+*not* in that accessory set (i.e. a real garment: dress, top, jacket,
+coat, jeans, trousers, skirt, shoes/trainers/boots, suit, bodysuit,
+shorts, jumpsuit). Also ran a one-time correction over existing data:
+found 9 already-`live` photos whose *only* items were accessory-only
+categories (e.g. a Dua Lipa bikini shot tagged just `hat`+`jewellery`, a
+Charli XCX Met Gala photo tagged only `other`) and reverted them to
+`queued` — data preserved, not deleted, so any that turn out to be a
+genuine miscategorisation (AI should have said "dress" not "other") can
+be manually republished from `/admin/photos`.
+
 ### 8. ~~Duplicate looks from syndicated photos~~ — FIXED (2026-07-18), see roadmap #2 for full writeup
 Same-image duplicates across multiple `photos` rows for one celebrity,
 caused by `resolve_articles` deduping only on `source_post_url` and not
