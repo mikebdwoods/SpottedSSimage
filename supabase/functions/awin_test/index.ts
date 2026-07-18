@@ -36,6 +36,20 @@ Deno.serve(async (req) => {
         text.match(/itemprop=["']price["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i) ??
         text.match(/"priceCurrency"\s*:\s*"GBP"\s*,\s*"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)/i) ??
         text.match(/"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)"?\s*,\s*"priceCurrency"\s*:\s*"GBP"/i);
+      // Jina Reader (r.jina.ai) returns markdown, not HTML - parse its shape
+      if (url.includes("r.jina.ai/")) {
+        const mdTitle = text.match(/^Title:\s*(.+)$/m)?.[1];
+        const mdImage = text.match(/!\[[^\]]*\]\((https?:[^)\s]+)\)/)?.[1];
+        const mdPrice = text.match(/£\s?([0-9]+(?:\.[0-9]{2})?)/)?.[1];
+        return {
+          url,
+          status: res.status,
+          ogImage: ogImage ?? mdImage,
+          title: title ?? mdTitle,
+          price: priceMatch?.[1] ?? mdPrice,
+          snippet: text.slice(0, 600),
+        };
+      }
       return { url, status: res.status, ogImage, title, price: priceMatch?.[1] };
     } catch (err) {
       return { url, error: err instanceof Error ? err.message : String(err) };
@@ -84,6 +98,10 @@ Deno.serve(async (req) => {
         results.push(await fetchOne(url));
         await new Promise((r) => setTimeout(r, 150));
       }
+      // Also persist to debug_log - slow fetches outlive pg_net's 5s wait,
+      // so the synchronous response is often lost to the caller.
+      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await supabase.from("debug_log").insert({ label: "fetch_urls", payload: { results } });
       return json({ results });
     }
     if (typeof body?.fetch_url === "string") {
