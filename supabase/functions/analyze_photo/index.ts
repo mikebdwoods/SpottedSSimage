@@ -160,7 +160,7 @@ serve(async (req) => {
     // Load photo and gate on pending so cron + manual calls never double-process
     const { data: photo, error: photoError } = await supabase
       .from("photos")
-      .select("id, image_url, ai_status")
+      .select("id, image_url, ai_status, status")
       .eq("id", photo_id)
       .single();
 
@@ -272,7 +272,13 @@ serve(async (req) => {
         ? `No clearly visible outfit in this image (${provider})`
         : `Identified ${items.length} item${items.length === 1 ? "" : "s"} via ${provider}: ${items.map((i) => i.category).join(", ")}`;
 
-    await supabase.from("photos").update({ ai_status: "done", ai_summary: summary }).eq("id", photo_id);
+    // Auto-publish: a real outfit was found and nobody has already
+    // hidden this photo - go straight live instead of waiting on manual
+    // review. Never touches a photo an admin explicitly moderated.
+    const update: Record<string, unknown> = { ai_status: "done", ai_summary: summary };
+    if (items.length > 0 && photo.status === "queued") update.status = "live";
+
+    await supabase.from("photos").update(update).eq("id", photo_id);
 
     return json({ success: true, photo_id, provider, created_item_ids: createdItemIds, summary });
   } catch (error) {
