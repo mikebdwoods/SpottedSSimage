@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { ImportPostButton } from "@/components/admin/import-post-button";
+import { FeedPostList, type FeedPost } from "@/components/admin/feed-post-list";
 
 export const metadata = { title: "Feed Inbox | Admin" };
 
@@ -114,69 +114,22 @@ export default async function AdminFeedPage({
           <p>No feed posts found for this filter.</p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden divide-y">
-          {posts.map((post) => {
+        <FeedPostList
+          posts={posts.map((post): FeedPost => {
             const celeb = post.celebrities as unknown as { name: string; slug: string } | null;
-            return (
-              <div key={post.id} className="flex items-start gap-4 p-4 hover:bg-gray-50">
-                {post.image_url && (
-                  <a
-                    href={post.image_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="shrink-0"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={post.image_url}
-                      alt=""
-                      className="w-20 h-24 object-cover rounded-lg bg-gray-100"
-                      loading="lazy"
-                    />
-                  </a>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground mb-1">
-                    <span className="font-semibold text-foreground">{celeb?.name ?? "—"}</span>
-                    {post.source_name && <span>· {post.source_name}</span>}
-                    {post.published_at && (
-                      <span>
-                        · {new Date(post.published_at).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm font-medium leading-snug line-clamp-2">
-                    {post.title ?? "Untitled post"}
-                  </p>
-                  <a
-                    href={post.publisher_url || post.link || "#"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:underline mt-1 inline-block"
-                  >
-                    View source →
-                  </a>
-                </div>
-                <div className="shrink-0">
-                  {post.photo_id ? (
-                    <Link
-                      href={`/admin/photos/${post.photo_id}`}
-                      className="text-xs font-semibold text-green-600 hover:underline"
-                    >
-                      Imported ✓
-                    </Link>
-                  ) : (
-                    <ImportPostButton postId={post.id} />
-                  )}
-                </div>
-              </div>
-            );
+            return {
+              id: post.id,
+              title: post.title,
+              image_url: post.image_url,
+              link: post.link,
+              publisher_url: post.publisher_url,
+              source_name: post.source_name,
+              published_at: post.published_at,
+              photo_id: post.photo_id,
+              celeb_name: celeb?.name ?? null,
+            };
           })}
-        </div>
+        />
       )}
 
       {/* Pagination */}
