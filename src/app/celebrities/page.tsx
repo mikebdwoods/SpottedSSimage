@@ -36,6 +36,7 @@ export default async function CelebritiesPage({
       "id, name, slug, photo_url, bio, photos(count)"
     )
     .eq("status", "published")
+    .in("photos.status", ["live", "approved"])
     .order("name", { ascending: true });
 
   if (q) {
