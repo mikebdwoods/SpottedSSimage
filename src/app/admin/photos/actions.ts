@@ -82,7 +82,8 @@ export async function triggerAIBatch(photoIds: string[]) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const secret = process.env.INTERNAL_API_SECRET!;
 
-  for (const photoId of photoIds) {
+  // Cap per click - the hourly cron works through the rest of the queue
+  for (const photoId of photoIds.slice(0, 20)) {
     fetch(`${baseUrl}/api/process-photo`, {
       method: "POST",
       headers: {

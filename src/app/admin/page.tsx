@@ -18,6 +18,8 @@ export default async function AdminDashboard() {
     { count: matchCount },
     { count: newsletterCount },
     { count: commentCount },
+    { count: feedCount },
+    { count: aiQueueCount },
     { data: recentPhotos },
   ] = await Promise.all([
     supabase.from("celebrities").select("*", { count: "exact", head: true }),
@@ -29,6 +31,14 @@ export default async function AdminDashboard() {
     supabase.from("item_matches").select("*", { count: "exact", head: true }),
     supabase.from("newsletter_signups").select("*", { count: "exact", head: true }),
     supabase.from("comments").select("*", { count: "exact", head: true }),
+    supabase
+      .from("external_posts")
+      .select("*", { count: "exact", head: true })
+      .is("photo_id", null),
+    supabase
+      .from("photos")
+      .select("*", { count: "exact", head: true })
+      .in("ai_status", ["pending", "processing"]),
     supabase
       .from("v_photo_inbox")
       .select("*")
@@ -43,6 +53,8 @@ export default async function AdminDashboard() {
     { label: "Product Matches", value: matchCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-amber-400" },
     { label: "Newsletter", value: newsletterCount ?? 0, href: "/admin/newsletter", colour: "border-l-4 border-l-pink-400" },
     { label: "Comments", value: commentCount ?? 0, href: "/admin/comments", colour: "border-l-4 border-l-gray-300" },
+    { label: "Feed Inbox", value: feedCount ?? 0, href: "/admin/feed", colour: "border-l-4 border-l-indigo-400" },
+    { label: "AI Queue", value: aiQueueCount ?? 0, href: "/admin/photos", colour: "border-l-4 border-l-red-300" },
   ];
 
   const quickActions = [
@@ -65,7 +77,7 @@ export default async function AdminDashboard() {
       </div>
 
       {/* Stats grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-10">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-10">
         {stats.map(({ label, value, href, colour }) => (
           <Link
             key={label}

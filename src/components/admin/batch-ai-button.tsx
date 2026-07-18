@@ -33,10 +33,10 @@ export function BatchAIButton({ pendingPhotoIds }: Props) {
       className="text-xs"
     >
       {done
-        ? `Queued ${pendingPhotoIds.length} photos`
+        ? `Queued ${Math.min(pendingPhotoIds.length, 20)} photos`
         : loading
         ? "Queuing..."
-        : `Run AI on ${pendingPhotoIds.length} pending`}
+        : `Run AI on ${Math.min(pendingPhotoIds.length, 20)} of ${pendingPhotoIds.length} pending`}
     </Button>
   );
 }
