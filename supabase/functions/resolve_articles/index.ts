@@ -247,7 +247,23 @@ Deno.serve(async (req) => {
             .limit(1)
             .maybeSingle();
 
-          if (!dupe) {
+          // Different articles (different source_post_url) very often
+          // syndicate the exact same wire/press photo for the same
+          // celebrity - dedupe on the image itself too, or the same look
+          // shows up as multiple separate "looks".
+          const { data: sameImage } = dupe
+            ? { data: null }
+            : await supabase
+                .from("photos")
+                .select("id")
+                .eq("celeb_id", post.celeb_id)
+                .eq("image_url", image)
+                .limit(1)
+                .maybeSingle();
+
+          const existing = dupe ?? sameImage;
+
+          if (!existing) {
             const { data: photo } = await supabase
               .from("photos")
               .insert({
@@ -266,14 +282,14 @@ Deno.serve(async (req) => {
               .single();
             photoId = photo?.id ?? null;
           } else {
-            photoId = dupe.id;
+            photoId = existing.id;
           }
 
           if (photoId) {
             await supabase.from("external_posts").update({ photo_id: photoId }).eq("id", post.id);
-            // AI runs via the existing hourly analyze-photos-hourly cron
-            // (20/batch, rate-limit aware) rather than firing here — this
-            // function can create far more photos per run than that budget.
+            // AI runs via the analyze-photos cron (batch, rate-limit aware)
+            // rather than firing here — this function can create far more
+            // photos per run than that budget.
           }
         }
 
