@@ -88,6 +88,7 @@ Active cron jobs (verified in `cron.job`, 2026-07-18):
 | `analyze-photos-hourly` | `5 * * * *` |
 | `match-products-hourly` | `15 * * * *` |
 | `resolve-articles-every-5min` (added 2026-07-18) | `*/5 * * * *` |
+| `refresh-observed-brand-affinity-6h` (added 2026-07-18) | `20 */6 * * *` |
 
 ### AI vision pipeline (`analyze_photo` Supabase edge function + `/api/process-photo` Next.js route)
 
@@ -111,6 +112,44 @@ Active cron jobs (verified in `cron.job`, 2026-07-18):
 - `match_products` scores catalog products against each clothing item
   (category synonyms + brand + colour) and only creates a match when
   there's a genuine connection — it does not force matches to pad numbers.
+
+### Celebrity brand-affinity knowledge base (added 2026-07-18)
+Product matching used to go blank whenever the AI vision pass couldn't
+read a brand off a garment (no visible logo — the common case for plain
+jeans, tees, etc). Now it falls back to what that celebrity is actually
+known to wear:
+
+- New table `celebrity_brand_affinity` (celeb_id, category, brand,
+  confidence, source, evidence_count). Two sources feed it:
+  - **`observed`** — aggregated from the celebrity's own AI-tagged
+    `clothing_items.brand_guess` history via
+    `refresh_observed_brand_affinity()` (SQL function, cron every 6h at
+    `:20`). The most trustworthy signal — it comes from real photos of
+    that person.
+  - **`ai_seed`** — general-knowledge brand associations from Gemini/Claude
+    (new `build_brand_profile` edge function), conservative and
+    category-specific (e.g. Bella Hadid → Chopard jewellery 0.8, Chrome
+    Hearts tops 0.5). Exists so a brand-new celebrity with zero photos
+    still has a fallback. Fires automatically when a celebrity is added
+    (`addCelebrity` action) and can be re-run per-celeb from
+    `/admin/celebrities/[id]` ("Rebuild brand profile").
+- **Backfilled for all 41 existing real celebrities** (363 affinity rows;
+  the 42nd celebrity row, "News Feed", is a non-celebrity placeholder used
+  for unattributed feed content and correctly got nothing).
+- `match_products` only uses the guess when `brand_guess` is null (never
+  overrides an actual AI read), scores it lower than a confirmed brand
+  match, and writes the guess to new `clothing_items.inferred_brand` /
+  `inferred_brand_confidence` columns rather than conflating it with
+  `brand_guess`.
+- UI never states a guess as fact: item pages show "Possibly {brand}" in
+  a dashed pill, and matches sourced this way get a "Style guess" badge
+  instead of "Exact match"/"Top pick".
+- **Verified end-to-end**: an Olivia Rodrigo dress item with no visible
+  brand correctly inferred "Vivienne Westwood" (her highest-confidence
+  `dress` affinity, 0.65). It produced zero product matches only because
+  the 6-row seed catalog (issue 2 above) has no dresses at all — the
+  inference and write-back worked correctly; there's just nothing to
+  match against yet.
 
 ### Data cleanup done this session
 
@@ -188,3 +227,17 @@ against 5 hand-verified photos.
 ### 4. Only 6 of 42 celebrities are published
 36 celebrity records exist but aren't publicly visible. Worth reviewing
 whether that's intentional (incomplete profiles) or just backlog.
+
+### 5. The product catalog gap (issue 2) now also blocks brand-guess matches
+The new celebrity brand-affinity fallback (above) correctly infers likely
+brands even with zero product matches, because the catalog has nothing
+in most categories to match against — confirmed live on an Olivia
+Rodrigo dress item. This makes populating a real product catalog even
+more valuable: it would immediately light up matches for both
+AI-confirmed brands and celebrity-style-guess brands at once.
+
+### 6. Minor: a "News Feed" placeholder occupies a `celebrities` row
+One of the 42 `celebrities` rows (slug `news-feed`) isn't a real
+celebrity — likely a catch-all used for unattributed feed content. It's
+harmless (correctly skipped by brand-profile seeding, never published)
+but worth a decision on whether to keep, hide, or delete it.

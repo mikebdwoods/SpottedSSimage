@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { EditCelebrityForm } from "@/components/admin/edit-celebrity-form";
 import { DeleteCelebrityButton } from "@/components/admin/delete-celebrity-button";
 import { PublishCelebrityToggle } from "@/components/admin/publish-celebrity-toggle";
+import { RebuildBrandProfileButton } from "@/components/admin/rebuild-brand-profile-button";
 
 export default async function AdminCelebrityEditPage({
   params,
@@ -14,13 +15,18 @@ export default async function AdminCelebrityEditPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: celeb }, { data: photos }] = await Promise.all([
+  const [{ data: celeb }, { data: photos }, { data: brandAffinity }] = await Promise.all([
     supabase.from("celebrities").select("*").eq("id", id).single(),
     supabase
       .from("photos")
       .select("id, image_url, ai_status, status, created_at")
       .eq("celeb_id", id)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("celebrity_brand_affinity")
+      .select("category, brand, confidence, source, evidence_count")
+      .eq("celeb_id", id)
+      .order("confidence", { ascending: false }),
   ]);
 
   if (!celeb) notFound();
@@ -67,6 +73,39 @@ export default async function AdminCelebrityEditPage({
               id={celeb.id}
               isPublished={celeb.status === "published"}
             />
+          </div>
+
+          <div className="mt-8 pt-6 border-t">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-sm font-semibold">Brand knowledge</h2>
+                <p className="text-xs text-muted-foreground">
+                  Used as an educated guess for product matching when the AI can&apos;t read a brand off a garment.
+                </p>
+              </div>
+              <RebuildBrandProfileButton celebId={celeb.id} />
+            </div>
+            {!brandAffinity || brandAffinity.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No brand knowledge yet.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {brandAffinity.map((row, i) => (
+                  <li key={i} className="flex items-center justify-between text-xs border rounded-lg px-3 py-1.5">
+                    <span>
+                      <span className="capitalize font-medium">{row.category ?? "any"}</span>
+                      {" — "}
+                      {row.brand}
+                    </span>
+                    <span className="flex items-center gap-2 text-muted-foreground">
+                      <span className={row.source === "observed" ? "text-green-700" : "text-blue-700"}>
+                        {row.source === "observed" ? `observed ×${row.evidence_count}` : "ai guess"}
+                      </span>
+                      {Math.round(row.confidence * 100)}%
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="mt-8 pt-6 border-t">
