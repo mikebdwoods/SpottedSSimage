@@ -24,8 +24,14 @@ interface Match {
   id: string;
   match_type: string | null;
   is_primary: boolean | null;
+  score: number | null;
   products: Product | null;
 }
+
+// Below this, a match is category-only (e.g. "it's a jacket") with no
+// brand or colour signal — real enough to list, but not confident enough
+// to badge as a recommendation.
+const CONFIDENT_MATCH_SCORE = 0.5;
 
 export async function generateMetadata({
   params,
@@ -107,7 +113,7 @@ export default async function ClothingItemPage({
   const [{ data: rawMatches }, { data: moreLooks }] = await Promise.all([
     supabase
       .from("item_matches")
-      .select("id, match_type, is_primary, products(*)")
+      .select("id, match_type, is_primary, score, products(*)")
       .eq("item_id", id)
       .order("is_primary", { ascending: false }),
     supabase
@@ -274,11 +280,14 @@ export default async function ClothingItemPage({
                                   Style guess
                                 </div>
                               )}
-                              {match.is_primary && match.match_type !== "exact" && match.match_type !== "celebrity_style_guess" && (
-                                <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
-                                  Top pick
-                                </div>
-                              )}
+                              {match.is_primary &&
+                                match.match_type !== "exact" &&
+                                match.match_type !== "celebrity_style_guess" &&
+                                (match.score ?? 0) >= CONFIDENT_MATCH_SCORE && (
+                                  <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
+                                    Top pick
+                                  </div>
+                                )}
                             </div>
 
                             {/* Product info */}
