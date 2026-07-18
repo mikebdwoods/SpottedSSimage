@@ -231,6 +231,26 @@ category-only match no longer gets badged as a confident recommendation
 — see `CONFIDENT_MATCH_SCORE` in the item page. The underlying gap
 (nothing genuinely close to match against) still needs a real catalog.
 
+**Awin account connected 2026-07-18** (`AWIN_API_TOKEN` secret, publisher
+account `2640528` "Spotted", auto-discovered via `/accounts` — no need for
+a separately-configured publisher ID secret). Confirmed live: the token
+works, but **the account has joined zero real retailer programmes** —
+only Awin's own administrative programme (id 3). Awin requires applying
+to and being approved by each retailer's affiliate programme
+individually (Selfridges, ASOS, Zara, END., etc.) before their product
+feed becomes accessible — this is a manual step in the Awin dashboard,
+not something that can be automated from here. **Nothing can be synced
+until at least a few programmes are joined.** A throwaway diagnostic
+function (`supabase/functions/awin_test`) confirms credentials and lists
+joined programmes — safe to delete once real sync exists. Rakuten not
+yet connected (user said "we can add more later").
+
+Next step once programmes are joined: build a `sync_products` edge
+function pulling each joined programme's Awin datafeed, generating real
+`awin1.com` tracking links (format
+`https://www.awin1.com/cread.php?awinmid={merchantId}&awinaffid=2640528&clickref=&p={destinationUrl}`),
+and upserting into `products`.
+
 ### 3. ~~Feed Inbox has never been used to import real content~~ — FIXED (2026-07-18)
 7,425 external posts have been scraped via RSS but, until issue 1 was
 fixed, importing them could only ever produce Google News icons — so
@@ -242,7 +262,20 @@ publish remains the gate before anything goes public.
 
 ### 4. Only 6 of 42 celebrities are published
 36 celebrity records exist but aren't publicly visible. Worth reviewing
-whether that's intentional (incomplete profiles) or just backlog.
+whether that's intentional (incomplete profiles) or just backlog. Note:
+now that resolve_articles auto-imports (issue 1/3), publishing more
+celebrities will surface a lot of queued-but-unpublished looks fairly
+fast (e.g. Dua Lipa already has 66 auto-imported photos, 0 published).
+
+### 7. ~~`/celebrities` directory showed a "looks" count that included unpublished photos~~ — FIXED (2026-07-18)
+The count on `/celebrities` used `photos(count)` with no status filter,
+so it counted every photo regardless of publish state — e.g. it showed
+"62 looks" for Dua Lipa while her actual page said "0 looks" (correctly
+filtered to `live`/`approved`). This got a lot more visible once
+issue 1's auto-import started creating dozens of `queued` photos per
+celebrity. Fixed by filtering the embedded count to
+`status in (live, approved)`, matching what the celebrity page itself
+shows.
 
 ### 5. The product catalog gap (issue 2) now also blocks brand-guess matches
 The new celebrity brand-affinity fallback (above) correctly infers likely
