@@ -82,7 +82,7 @@ async function callGemini(apiKey: string, imageBase64: string, mediaType: string
 
   if (!res.ok) {
     const errBody = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${errBody.slice(0, 300)}`);
+    throw new Error(`Gemini API error ${res.status}: ${errBody.slice(0, 1200)}`);
   }
 
   const data = await res.json();
@@ -212,10 +212,16 @@ serve(async (req) => {
         provider = "claude";
       }
     } catch (primaryErr) {
+      const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
       if (geminiKey && claudeKey) {
-        console.log("[analyze_photo] Gemini failed, falling back to Claude:", primaryErr);
-        rawText = await callClaude(claudeKey, imageBase64, mediaType);
-        provider = "claude-fallback";
+        console.log("[analyze_photo] Gemini failed, falling back to Claude:", primaryMsg);
+        try {
+          rawText = await callClaude(claudeKey, imageBase64, mediaType);
+          provider = "claude-fallback";
+        } catch (fallbackErr) {
+          const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+          throw new Error(`Gemini failed (${primaryMsg}); Claude fallback also failed (${fallbackMsg})`);
+        }
       } else {
         throw primaryErr;
       }
