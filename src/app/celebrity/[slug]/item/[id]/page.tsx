@@ -63,36 +63,81 @@ export async function generateMetadata({
   };
 }
 
-type PriceTier = "premium" | "mid" | "budget";
+// Sort helper: cheapest first, unknown prices last
+function byPriceAsc(a: Match, b: Match): number {
+  const pa = a.products?.price ?? null;
+  const pb = b.products?.price ?? null;
+  if (pa == null && pb == null) return 0;
+  if (pa == null) return 1;
+  if (pb == null) return -1;
+  return Number(pa) - Number(pb);
+}
 
-const TIER_CONFIG: Record<
-  PriceTier,
-  { label: string; range: string; badgeClass: string }
-> = {
-  premium: {
-    label: "Premium",
-    range: "£70+",
-    badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
-  },
-  mid: {
-    label: "Mid-Range",
-    range: "£45–£70",
-    badgeClass: "bg-blue-50 text-blue-800 border-blue-200",
-  },
-  budget: {
-    label: "Budget",
-    range: "under £45",
-    badgeClass: "bg-green-50 text-green-800 border-green-200",
-  },
-};
+function ProductCard({ match, celebName }: { match: Match; celebName: string }) {
+  const product = match.products!;
+  return (
+    <a
+      href={product.product_url ?? "#"}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex flex-col border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+    >
+      {/* Product image */}
+      <div className="aspect-square relative overflow-hidden bg-gray-100">
+        {product.image_url ? (
+          <Image
+            src={product.image_url}
+            alt={product.title}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <ShoppingBag className="h-8 w-8 text-gray-300" />
+          </div>
+        )}
+        {match.match_type === "exact" && (
+          <div className="absolute top-2 left-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+            Exact match
+          </div>
+        )}
+        {match.match_type === "celebrity_style_guess" && (
+          <div
+            className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed"
+            title={`No visible brand markings — suggested based on ${celebName}'s known style`}
+          >
+            Style guess
+          </div>
+        )}
+        {match.is_primary &&
+          match.match_type !== "exact" &&
+          match.match_type !== "celebrity_style_guess" &&
+          (match.score ?? 0) >= CONFIDENT_MATCH_SCORE && (
+            <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
+              Top pick
+            </div>
+          )}
+      </div>
 
-const TIER_ORDER: PriceTier[] = ["premium", "mid", "budget"];
-
-function tierForPrice(price: number | null): PriceTier {
-  if (price == null) return "mid";
-  if (price < 45) return "budget";
-  if (price <= 70) return "mid";
-  return "premium";
+      {/* Product info */}
+      <div className="p-3 flex flex-col flex-1">
+        <p className="text-sm font-semibold line-clamp-2 flex-1">{product.title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {[product.brand, product.retailer].filter(Boolean).join(" · ")}
+        </p>
+        <div className="flex items-center justify-between mt-3 pt-3 border-t">
+          <p className="text-base font-black">
+            {product.price != null ? formatPrice(Number(product.price)) : "See price"}
+          </p>
+          <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+            Buy
+            <ExternalLink className="h-3 w-3" />
+          </span>
+        </div>
+      </div>
+    </a>
+  );
 }
 
 export default async function ClothingItemPage({
@@ -131,15 +176,31 @@ export default async function ClothingItemPage({
     (m) => m.products && (m.products.product_url || m.products.image_url)
   );
 
-  const matchesByTier = TIER_ORDER.reduce<Record<PriceTier, Match[]>>(
-    (acc, tier) => {
-      acc[tier] = matches.filter(
-        (m) => tierForPrice(m.products?.price ?? null) === tier
-      );
-      return acc;
-    },
-    { premium: [], mid: [], budget: [] }
+  // The exact garment (best-scoring 'exact' match), then verified cheaper
+  // alternatives ('dupe', sourced specifically to cost less), then anything
+  // else the generic matcher found. A "dupe" whose real page price turned
+  // out to be >= the exact price gets demoted to "more like this" - the
+  // "for less" section never lies.
+  const exactMatch =
+    matches
+      .filter((m) => m.match_type === "exact")
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0] ?? null;
+  const exactPrice = exactMatch?.products?.price ?? null;
+
+  const cheaperAlternatives = matches
+    .filter((m) => m.match_type === "dupe" && m.id !== exactMatch?.id)
+    .filter((m) => {
+      const p = m.products?.price ?? null;
+      return exactPrice == null || p == null || Number(p) < Number(exactPrice);
+    })
+    .sort(byPriceAsc);
+
+  const shownIds = new Set(
+    [exactMatch?.id, ...cheaperAlternatives.map((m) => m.id)].filter(Boolean)
   );
+  const otherMatches = matches
+    .filter((m) => !shownIds.has(m.id))
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   const hasMatches = matches.length > 0;
   const totalMatches = matches.length;
@@ -223,100 +284,53 @@ export default async function ClothingItemPage({
             </div>
           ) : (
             <div className="space-y-14">
-              {TIER_ORDER.map((tier) => {
-                const items = matchesByTier[tier];
-                if (!items || items.length === 0) return null;
-                const config = TIER_CONFIG[tier];
-
-                return (
-                  <div key={tier}>
-                    {/* Tier header */}
-                    <div className="flex items-center gap-3 mb-5">
-                      <h2 className="text-xl font-bold">{config.label}</h2>
-                      <span
-                        className={`text-xs font-semibold border rounded-full px-2.5 py-0.5 ${config.badgeClass}`}
-                      >
-                        {config.range}
-                      </span>
-                    </div>
-
-                    {/* Product grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {items.map((match) => {
-                        const product = match.products!;
-                        return (
-                          <a
-                            key={match.id}
-                            href={product.product_url ?? "#"}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group flex flex-col border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
-                          >
-                            {/* Product image */}
-                            <div className="aspect-square relative overflow-hidden bg-gray-100">
-                              {product.image_url ? (
-                                <Image
-                                  src={product.image_url}
-                                  alt={product.title}
-                                  fill
-                                  className="object-cover group-hover:scale-105 transition-transform duration-500"
-                                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <ShoppingBag className="h-8 w-8 text-gray-300" />
-                                </div>
-                              )}
-                              {match.match_type === "exact" && (
-                                <div className="absolute top-2 left-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded-full">
-                                  Exact match
-                                </div>
-                              )}
-                              {match.match_type === "celebrity_style_guess" && (
-                                <div
-                                  className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed"
-                                  title={`No visible brand markings — suggested based on ${celeb.name}'s known style`}
-                                >
-                                  Style guess
-                                </div>
-                              )}
-                              {match.is_primary &&
-                                match.match_type !== "exact" &&
-                                match.match_type !== "celebrity_style_guess" &&
-                                (match.score ?? 0) >= CONFIDENT_MATCH_SCORE && (
-                                  <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
-                                    Top pick
-                                  </div>
-                                )}
-                            </div>
-
-                            {/* Product info */}
-                            <div className="p-3 flex flex-col flex-1">
-                              <p className="text-sm font-semibold line-clamp-2 flex-1">
-                                {product.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {[product.brand, product.retailer].filter(Boolean).join(" · ")}
-                              </p>
-                              <div className="flex items-center justify-between mt-3 pt-3 border-t">
-                                <p className="text-base font-black">
-                                  {product.price != null
-                                    ? formatPrice(Number(product.price))
-                                    : "See price"}
-                                </p>
-                                <span className="flex items-center gap-1 text-xs font-semibold text-primary">
-                                  Buy
-                                  <ExternalLink className="h-3 w-3" />
-                                </span>
-                              </div>
-                            </div>
-                          </a>
-                        );
-                      })}
-                    </div>
+              {/* The exact one */}
+              {exactMatch && (
+                <div>
+                  <div className="flex items-center gap-3 mb-5">
+                    <h2 className="text-xl font-bold">The exact one</h2>
+                    <span className="text-xs font-semibold border rounded-full px-2.5 py-0.5 bg-black text-white">
+                      As worn by {celeb.name}
+                    </span>
                   </div>
-                );
-              })}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <ProductCard match={exactMatch} celebName={celeb.name} />
+                  </div>
+                </div>
+              )}
+
+              {/* Cheaper alternatives */}
+              {cheaperAlternatives.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-3 mb-5">
+                    <h2 className="text-xl font-bold">
+                      {exactMatch ? "Get the look for less" : "Get the look"}
+                    </h2>
+                    <span className="text-xs font-semibold border rounded-full px-2.5 py-0.5 bg-green-50 text-green-800 border-green-200">
+                      {exactMatch ? "Cheaper alternatives" : "Verified matches"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {cheaperAlternatives.map((match) => (
+                      <ProductCard key={match.id} match={match} celebName={celeb.name} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Everything else the matcher found */}
+              {otherMatches.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-3 mb-5">
+                    <h2 className="text-xl font-bold">More like this</h2>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {otherMatches.map((match) => (
+                      <ProductCard key={match.id} match={match} celebName={celeb.name} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
