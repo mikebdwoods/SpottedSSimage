@@ -4,28 +4,85 @@ Snapshot date: **2026-07-18**. This file is the source of truth for "what's
 built" vs "what's still broken/missing." Update it whenever a major piece
 ships or a new issue is found — don't let it drift like the last one did.
 
-## Current database snapshot (live, updated 2026-07-18 late evening)
+## Current database snapshot (live, updated 2026-07-18 ~14:40 UTC)
 
 | Metric | Value |
 |---|---|
-| Photos (total) | 924 — 98 `live` (auto-published), 826 `queued`; 99 `ai_status=done`, 821 `pending`, 4 `error` |
+| Photos (total) | 1,077 — 118 `live` (auto-published), 959 `queued`; 954 still `ai_status=pending` |
 | Celebrities | 42 total, 6 published |
-| Clothing items | 445 |
-| Item matches | 256 |
-| Products (catalog) | 16 (6 generic seed + 10 real: 5 END., 3 Missoma, 2 Uniqlo) |
-| External posts (news feed) | 7,425 — resolver still working through the backlog |
+| Clothing items | 504 (sourcing: 498 unattempted, 3 sourced, 1 no_source, 2 error — cron just started) |
+| Item matches | 302 |
+| Products (catalog) | 19 (6 generic seed + 13 real, auto-sourcing now adding more continuously) |
+| External posts | 7,425 — 1,096 resolved w/ real photo, 731 no usable image, 5,591 still queued (~19h left) |
 | Celebrity brand affinity rows | 375 |
 
-Growth since this morning (5 photos / 26 items / 6 products / 0 imported)
-is the resolver + auto-import + auto-publish pipeline running
-continuously, not manual work — it will keep growing on its own via the
-5-min resolve cron and hourly AI/match cron. Photo counts in this table
-will already be stale by the time you read this.
+All growth is the automated pipeline (resolve → import → AI-tag →
+auto-publish → source → match) running by itself. This table is stale the
+moment it's written; treat it as a point-in-time reference. Started the
+day at 5 photos / 26 items / 6 products.
 
-The two numbers that matter most right now: **only 5 real photos exist**,
-and **none of the 7,425 scraped news posts have been imported yet**. Almost
-everything described as "built" below is a working pipeline with almost no
-content flowing through it.
+---
+
+## What's next — prioritized roadmap (written 2026-07-18)
+
+In priority order, with reasoning. Items 1 is done; the rest are open.
+
+### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
+With the resolver importing hundreds of photos/day, hourly AI tagging at
+20/batch (480/day) had become the pipeline's choke point — 954 photos
+pending and rising. Rescheduled: `analyze-photos-every-10min` (2,880/day
+capacity) replaces `analyze-photos-hourly`; `match-products-every-15min`
+(2,880 items/day) replaces `match-products-hourly`. Backlog should clear
+in under a day; capacity now comfortably exceeds inflow.
+
+### 2. Duplicate-look collapse (biggest visible quality problem next)
+Multiple outlets syndicate the same agency photo, and the resolver
+imports each article separately — so a celebrity's page will show
+near-identical looks several times (e.g. several Dua Lipa honeymoon
+posts using the same paparazzi set). Options, in increasing effort:
+exact `image_url` dedupe at import (cheap, catches some), image
+content-hash dedupe (download + perceptual hash at import, catches
+syndication with different CDN URLs), or grouping near-duplicate photos
+into a single look. Recommend starting with a hash-at-import check plus
+a one-off cleanup pass over existing photos.
+
+### 3. Publish more celebrities (instant breadth, near-zero work)
+Only 6 of 42 celebrities are published, but the pipeline is importing
+content for all of them — the other 36 have looks piling up invisibly.
+Either review + publish manually in `/admin/celebrities`, or (consistent
+with the auto-publish philosophy) auto-publish any celebrity once they
+have ≥3 live looks and a profile photo. The second is a small change to
+the pipeline and keeps everything hands-off.
+
+### 4. Affiliate revenue (user action required first)
+Every product link is currently a plain retailer link earning nothing.
+Blocked on Awin retailer-programme approvals (manual, in the Awin
+dashboard — apply to END., ASOS, etc.). Once ≥1 programme is approved:
+build the link-rewriter (plain URL → `awin1.com/cread.php?...` tracking
+URL for retailers with an approved programme, leave others direct) and
+the Awin datafeed sync for bulk catalog. Until then, revenue is zero by
+construction.
+
+### 5. Sourcing quality review + catalog scale-up decision
+After the sourcing backlog drains (~2 days), review the hit rate in
+`debug_log` (`label='source_products'`) and spot-check match quality on
+the site. If grounded-search sourcing under-delivers, build the sitemap
+bulk-ingester for proven-scrapeable retailers (END./Missoma/Uniqlo
+publish full product sitemaps — thousands of SKUs, no AI cost).
+
+### 6. Engagement + growth surface (currently unused)
+Comments (0), saved looks (0), newsletter (1 signup, no sends). The
+machinery exists but nothing drives usage. Candidates: weekly automated
+newsletter ("this week's top looks" from live data), trending page
+tuning, and basic SEO checks (sitemap/OG images exist; verify indexing).
+Worth doing only after the content+dedupe items above — growth on top of
+a feed full of duplicate looks would waste the traffic.
+
+### 7. Ops hygiene (small, whenever)
+Retry/clear the 4 `ai_status=error` photos; decide the fate of the
+"News Feed" placeholder celebrity; purge `debug_log` periodically (add
+a weekly cleanup cron); delete the `awin_test` diagnostic function once
+sourcing is stable.
 
 ---
 
@@ -72,7 +129,7 @@ Google News RSS ──(cron: every 2h, "rss-ingest-every-2-hours")──▶ exte
        ▼  cron: every 5 min ("resolve-articles-every-5min") — decode link, scrape real
        │  article photo, auto-import into photos (status: queued, ai_status: pending)
        │
-       ▼  cron: hourly at :05 ("analyze-photos-hourly") — analyze_photo edge function
+       ▼  cron: every 10 min ("analyze-photos-every-10min") — analyze_photo edge function
     clothing_items (category, color, brand_guess, description)
        │  photo AUTO-PUBLISHES (status → live) when a real outfit is found
        │
@@ -81,7 +138,7 @@ Google News RSS ──(cron: every 2h, "rss-ingest-every-2-hours")──▶ exte
        │   URL is fetched + verified (direct, then Jina Reader proxy for
        │   bot-walled retailers) before insertion into products
        │
-       ▼  cron: hourly at :15 ("match-products-hourly") — match_products edge function
+       ▼  cron: every 15 min ("match-products-every-15min") — match_products edge function
     item_matches ──▶ products (shoppable links, price tiers)
        │
        ▼  Public site — admin panel is now for moderation (hide), not publishing
@@ -93,8 +150,8 @@ Active cron jobs (verified in `cron.job`, 2026-07-18):
 |---|---|
 | `rss-ingest-every-2-hours` | `0 */2 * * *` |
 | `ingest-queue-every-30min` / `process-ingest-queue` | `*/30 * * * *` |
-| `analyze-photos-hourly` | `5 * * * *` |
-| `match-products-hourly` | `15 * * * *` |
+| `analyze-photos-every-10min` (was hourly; bumped 2026-07-18 for throughput) | `*/10 * * * *` |
+| `match-products-every-15min` (was hourly; bumped 2026-07-18) | `*/15 * * * *` |
 | `resolve-articles-every-5min` (added 2026-07-18) | `*/5 * * * *` |
 | `refresh-observed-brand-affinity-6h` (added 2026-07-18) | `20 */6 * * *` |
 | `source-products-every-20min` (added 2026-07-18) | `*/20 * * * *` |
@@ -181,7 +238,13 @@ branding off a jacket, "brat" merch text off a top).
 
 ---
 
-## What still needs addressing
+## Build log — issues found & fixed (historical, chronological)
+
+For what's still open, see **"What's next — prioritized roadmap"** near
+the top of this file. Everything below is a dated record of problems
+diagnosed and fixed during initial buildout — kept for context on *why*
+things are built the way they are, not a current task list. Numbering
+is chronological-by-discovery, not priority (that's the roadmap's job).
 
 ### -1. Photos now auto-publish (2026-07-18 late evening) — supersedes issue 0 below
 User explicitly asked for the manual-publish gate to go: "I want the
@@ -417,7 +480,7 @@ this way, AI-tagging in progress via the hourly cron; thousands more
 will follow as the resolve backlog clears over the next ~24h. Admin
 publish remains the gate before anything goes public.
 
-### 4. Only 6 of 42 celebrities are published
+### 4. Only 6 of 42 celebrities are published — STILL OPEN, tracked as roadmap #3
 36 celebrity records exist but aren't publicly visible. Worth reviewing
 whether that's intentional (incomplete profiles) or just backlog. Note:
 publishing more celebrities now surfaces looks fast — photos auto-publish
@@ -433,15 +496,15 @@ celebrity. Fixed by filtering the embedded count to
 `status in (live, approved)`, matching what the celebrity page itself
 shows.
 
-### 5. The product catalog gap (issue 2) now also blocks brand-guess matches
-The new celebrity brand-affinity fallback (above) correctly infers likely
-brands even with zero product matches, because the catalog has nothing
-in most categories to match against — confirmed live on an Olivia
-Rodrigo dress item. This makes populating a real product catalog even
-more valuable: it would immediately light up matches for both
-AI-confirmed brands and celebrity-style-guess brands at once.
+### 5. The product catalog gap (issue 2) now also blocks brand-guess matches — LARGELY RESOLVED by automated sourcing
+The celebrity brand-affinity fallback correctly infers likely brands
+even with zero product matches, but had nothing to match against in
+most categories. The `source_products` automation (see issue 2's
+2026-07-18 night update) now fills exactly this gap continuously —
+verified live producing a real Pandora ring match for a jewellery item
+that previously had none.
 
-### 6. Minor: a "News Feed" placeholder occupies a `celebrities` row
+### 6. Minor: a "News Feed" placeholder occupies a `celebrities` row — STILL OPEN, tracked as roadmap #7
 One of the 42 `celebrities` rows (slug `news-feed`) isn't a real
 celebrity — likely a catch-all used for unattributed feed content. It's
 harmless (correctly skipped by brand-profile seeding, never published)
