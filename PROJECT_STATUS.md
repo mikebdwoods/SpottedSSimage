@@ -87,6 +87,7 @@ Active cron jobs (verified in `cron.job`, 2026-07-18):
 | `ingest-queue-every-30min` / `process-ingest-queue` | `*/30 * * * *` |
 | `analyze-photos-hourly` | `5 * * * *` |
 | `match-products-hourly` | `15 * * * *` |
+| `resolve-articles-every-5min` (added 2026-07-18) | `*/5 * * * *` |
 
 ### AI vision pipeline (`analyze_photo` Supabase edge function + `/api/process-photo` Next.js route)
 
@@ -134,26 +135,38 @@ branding off a jacket, "brat" merch text off a top).
 
 ## What still needs addressing
 
-### 1. Production site shows stale/placeholder images (open, unconfirmed root cause)
-User-reported and screenshotted on 2026-07-18: `/looks` shows generic
-"Google News" icon placeholders instead of real photos, and a Gracie
-Abrams look page dated "29 October 2025" is stuck on "Identifying
-clothing items... this page will update automatically."
+### 1. ~~Site shows Google News icons instead of real photos~~ — ROOT CAUSE FOUND & FIXED (2026-07-18)
+The "junk" placeholder photos weren't seed data — they were the **Google
+News logo**, and the pipeline itself was creating them. Google News RSS
+never includes the article's real photo (its `media:content` is always
+the Google News icon) and its links are encrypted
+`news.google.com/rss/articles/CBMi...` redirects, so 7,397 of 7,425
+`external_posts` had the icon as their image and no publisher URL.
+Every Feed Inbox import copied that icon straight into `photos` — which
+is exactly what the user's screenshots showed. Deleting the junk photos
+earlier only treated the symptom.
 
-A DB check run immediately before and immediately after the screenshots
-were taken both confirm: **5 total photos, all `status='live'`, all
-`ai_status='done'`** — no photo is stuck processing, and none of the junk
-placeholder rows still exist server-side. This strongly points to a
-**caching problem** rather than a data problem — likely candidates:
-- Next.js ISR (`revalidate`) serving a stale cached page
-- Vercel CDN edge cache
-- Browser cache on the user's device
-- The screenshots being from a stale tab/session opened before the cleanup
+**The fix (all deployed):**
+- New `resolve_articles` edge function: decodes each Google News link to
+  the real publisher article via Google's own `batchexecute` endpoint
+  (fetch splash page → extract signature/timestamp → POST to decode),
+  then scrapes the article's `og:image`/`twitter:image`. Verified live:
+  Pitchfork, Rolling Stone etc. links now resolve to real CDN photo URLs.
+- `external_posts` gained `resolve_status` / `resolve_error` /
+  `resolved_at`; cron `resolve-articles-every-5min` works through the
+  backlog 25 at a time, newest first (~24 h to clear 7,394 posts).
+  Rate-limit responses pause the batch and retry next run.
+- Feed Inbox now only shows **resolved** posts (real photos), with a
+  counter for how many are still resolving.
+- Import actions hard-refuse any post whose image host is
+  `lh3.googleusercontent.com` / `news.google.com` / `gstatic.com`, so a
+  placeholder can never become a photo again.
 
-**Not yet investigated or fixed** — this is the next task. Needs
-confirming which layer is stale (check `revalidate` values on `/looks` and
-the photo page, check response cache headers, try a hard-refresh /
-incognito load) before making a change.
+**Remaining verification:** once the backlog resolves, import a batch via
+`/admin/feed` and confirm real photos flow end-to-end (import → AI →
+publish → public site). If the user still sees icon placeholders on the
+live site after this, that's browser/CDN cache of the old (deleted)
+pages — the DB contains no icon photos at all.
 
 ### 2. Product catalog is empty — shopping links are barely meaningful
 Only 6 seed products exist in `products` against 26 real `clothing_items`,
@@ -164,13 +177,13 @@ make match quality meaningful at scale.
 
 ### 3. Feed Inbox has never been used to import real content
 7,425 external posts have been scraped via RSS, but **0 have been
-imported into `photos`**. The entire pipeline downstream of import
-(AI tagging, product matching, publishing) has only ever been tested
-against 5 hand-verified photos. The site currently has almost no content
-because this step hasn't happened yet — importing a meaningful batch via
-`/admin/feed` is the highest-leverage next step for actually populating
-the site once the caching issue above is resolved (no point importing
-more content if it won't render correctly).
+imported into `photos`**. Until 2026-07-18 this was actually impossible
+to do usefully — imports could only produce Google News icons (see
+issue 1). Now that article resolution is live, importing a batch via
+`/admin/feed` once the backlog resolves is the highest-leverage step for
+actually populating the site. The pipeline downstream of import
+(AI tagging, product matching, publishing) has so far only been proven
+against 5 hand-verified photos.
 
 ### 4. Only 6 of 42 celebrities are published
 36 celebrity records exist but aren't publicly visible. Worth reviewing

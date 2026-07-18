@@ -23,12 +23,15 @@ export default async function AdminFeedPage({
     .select("id, name, slug")
     .order("name", { ascending: true });
 
+  // Only resolved posts have a real article photo (Google News RSS supplies
+  // its own logo until resolve_articles decodes the publisher link).
   let query = supabase
     .from("external_posts")
     .select(
       "id, title, image_url, link, publisher_url, source_name, published_at, photo_id, celebrities(name, slug)",
       { count: "exact" }
     )
+    .eq("resolve_status", "resolved")
     .not("image_url", "is", null)
     .order("published_at", { ascending: false, nullsFirst: false })
     .range(from, to);
@@ -44,6 +47,12 @@ export default async function AdminFeedPage({
   const { data: posts, count } = await query;
   const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
 
+  const { count: unresolvedCount } = await supabase
+    .from("external_posts")
+    .select("id", { count: "exact", head: true })
+    .is("resolve_status", null)
+    .is("photo_id", null);
+
   const buildHref = (p: { celeb?: string; page?: number; imported?: string }) => {
     const q = new URLSearchParams();
     if (p.celeb) q.set("celeb", p.celeb);
@@ -58,7 +67,10 @@ export default async function AdminFeedPage({
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Feed Inbox</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {count?.toLocaleString() ?? 0} posts from celebrity news feeds — import the best ones as looks.
+          {count?.toLocaleString() ?? 0} posts with real photos, ready to import as looks.
+          {(unresolvedCount ?? 0) > 0 && (
+            <> {unresolvedCount!.toLocaleString()} more are still being resolved to their source articles and will appear here automatically.</>
+          )}
         </p>
       </div>
 
