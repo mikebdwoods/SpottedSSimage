@@ -40,15 +40,98 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-// Errors that will resolve themselves (billing top-up, rate limits, API
-// blips) put the photo back to 'pending' so the hourly cron retries it.
+// Errors that will resolve themselves (billing top-up, rate limits, quota,
+// API blips) put the photo back to 'pending' so the hourly cron retries it.
 function isRetryableApiError(msg: string): boolean {
   return (
     msg.includes("credit balance") ||
     msg.includes("Claude API error 429") ||
     msg.includes("Claude API error 5") ||
-    msg.includes("overloaded")
+    msg.includes("Gemini API error 429") ||
+    msg.includes("Gemini API error 5") ||
+    msg.includes("RESOURCE_EXHAUSTED") ||
+    msg.includes("UNAVAILABLE") ||
+    msg.includes("overloaded") ||
+    msg.includes("rate limit")
   );
+}
+
+function stripJsonFences(text: string): string {
+  return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+}
+
+async function callGemini(apiKey: string, imageBase64: string, mediaType: string): Promise<string> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: AI_PROMPT },
+              { inline_data: { mime_type: mediaType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.2 },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errBody.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const candidate = data.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("Gemini blocked the image for safety reasons");
+  }
+  const text = (candidate?.content?.parts ?? [])
+    .map((p: { text?: string }) => p.text ?? "")
+    .join("");
+  if (!text) throw new Error("Gemini returned no content");
+  return text;
+}
+
+async function callClaude(apiKey: string, imageBase64: string, mediaType: string): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+            { type: "text", text: AI_PROMPT },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Claude API error ${res.status}: ${errBody.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text = (data.content ?? [])
+    .filter((b: { type: string }) => b.type === "text")
+    .map((b: { text: string }) => b.text)
+    .join("");
+  if (!text) throw new Error("Claude returned no content");
+  return text;
 }
 
 serve(async (req) => {
@@ -90,12 +173,13 @@ serve(async (req) => {
       return json({ error: "Photo has no image URL" }, 422);
     }
 
-    // Without an API key, leave the photo pending so it is retried once the
-    // ANTHROPIC_API_KEY secret is configured - never invent placeholder data.
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) {
-      console.log("[analyze_photo] ANTHROPIC_API_KEY not set - leaving photo pending");
-      return json({ skipped: true, reason: "ANTHROPIC_API_KEY secret not configured" });
+    // Gemini is tried first (free tier), Claude is the fallback/upgrade path.
+    // Without either key, leave the photo pending - never invent placeholder data.
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    const claudeKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!geminiKey && !claudeKey) {
+      console.log("[analyze_photo] No AI API key configured - leaving photo pending");
+      return json({ skipped: true, reason: "No GEMINI_API_KEY or ANTHROPIC_API_KEY secret configured" });
     }
 
     await supabase.from("photos").update({ ai_status: "processing", ai_summary: null }).eq("id", photo_id);
@@ -116,41 +200,28 @@ serve(async (req) => {
     if (bytes.length > 20 * 1024 * 1024) throw new Error("Image too large");
     const imageBase64 = bytesToBase64(bytes);
 
-    // Call Claude Vision
-    const aiRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2048,
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-              { type: "text", text: AI_PROMPT },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!aiRes.ok) {
-      const errBody = await aiRes.text();
-      throw new Error(`Claude API error ${aiRes.status}: ${errBody.slice(0, 300)}`);
+    // Gemini first (free), Claude as fallback if Gemini fails and a key exists
+    let rawText: string;
+    let provider: string;
+    try {
+      if (geminiKey) {
+        rawText = await callGemini(geminiKey, imageBase64, mediaType);
+        provider = "gemini";
+      } else {
+        rawText = await callClaude(claudeKey!, imageBase64, mediaType);
+        provider = "claude";
+      }
+    } catch (primaryErr) {
+      if (geminiKey && claudeKey) {
+        console.log("[analyze_photo] Gemini failed, falling back to Claude:", primaryErr);
+        rawText = await callClaude(claudeKey, imageBase64, mediaType);
+        provider = "claude-fallback";
+      } else {
+        throw primaryErr;
+      }
     }
 
-    const aiData = await aiRes.json();
-    const rawText = (aiData.content ?? [])
-      .filter((b: { type: string }) => b.type === "text")
-      .map((b: { text: string }) => b.text)
-      .join("");
-
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    const jsonText = stripJsonFences(rawText);
     const parsed: unknown[] = JSON.parse(jsonText);
 
     const items = parsed
@@ -192,19 +263,19 @@ serve(async (req) => {
 
     const summary =
       items.length === 0
-        ? "No clearly visible outfit in this image"
-        : `Identified ${items.length} item${items.length === 1 ? "" : "s"}: ${items.map((i) => i.category).join(", ")}`;
+        ? `No clearly visible outfit in this image (${provider})`
+        : `Identified ${items.length} item${items.length === 1 ? "" : "s"} via ${provider}: ${items.map((i) => i.category).join(", ")}`;
 
     await supabase.from("photos").update({ ai_status: "done", ai_summary: summary }).eq("id", photo_id);
 
-    return json({ success: true, photo_id, created_item_ids: createdItemIds, summary });
+    return json({ success: true, photo_id, provider, created_item_ids: createdItemIds, summary });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[analyze_photo] Error:", msg);
     if (photoId) {
       if (isRetryableApiError(msg)) {
-        // Transient (billing/rate limit/API blip): back to pending for the
-        // hourly cron to retry - keep the reason visible in ai_summary.
+        // Transient (billing/rate limit/quota/API blip): back to pending for
+        // the hourly cron to retry - keep the reason visible in ai_summary.
         await supabase.from("photos").update({ ai_status: "pending", ai_summary: `Will retry: ${msg.slice(0, 400)}` }).eq("id", photoId);
       } else {
         await supabase.from("photos").update({ ai_status: "error", ai_summary: msg.slice(0, 500) }).eq("id", photoId);

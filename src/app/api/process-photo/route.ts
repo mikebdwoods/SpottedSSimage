@@ -21,6 +21,7 @@ Guidelines:
 - Be specific — "fitted black ribbed polo neck top" is better than "black top"
 - For jewellery, describe the type (e.g. "gold hoop earrings", "layered gold chain necklace")
 - For bags, describe the silhouette and hardware (e.g. "structured black leather tote with gold chain strap")
+- If the image does not clearly show a person's outfit (e.g. a logo, a crowd shot, an album cover), return an empty array []
 
 Return ONLY a valid JSON array. No markdown, no explanation, no code blocks. Example:
 [{"category":"dress","color":"black","brand_guess":"Versace","description":"Floor-length black satin slip dress with thin spaghetti straps and thigh-high side split."},{"category":"shoes","color":"silver","brand_guess":null,"description":"Strappy silver stiletto heeled sandals with wrap-around ankle ties."}]`;
@@ -51,6 +52,72 @@ function normaliseItems(raw: unknown[]): ClothingItem[] {
     }));
 }
 
+function stripJsonFences(text: string): string {
+  return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+}
+
+async function callGemini(apiKey: string, imageBase64: string, mediaType: string): Promise<string> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: AI_PROMPT },
+              { inline_data: { mime_type: mediaType, data: imageBase64 } },
+            ],
+          },
+        ],
+        generationConfig: { temperature: 0.2 },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Gemini API error ${res.status}: ${errBody.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const candidate = data.candidates?.[0];
+  if (candidate?.finishReason === "SAFETY") {
+    throw new Error("Gemini blocked the image for safety reasons");
+  }
+  const text = (candidate?.content?.parts ?? [])
+    .map((p: { text?: string }) => p.text ?? "")
+    .join("");
+  if (!text) throw new Error("Gemini returned no content");
+  return text;
+}
+
+async function callClaude(apiKey: string, imageBase64: string, mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif"): Promise<string> {
+  const anthropic = new Anthropic({ apiKey });
+
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 2048,
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+          { type: "text", text: AI_PROMPT },
+        ],
+      },
+    ],
+  });
+
+  const rawText = message.content
+    .filter((b) => b.type === "text")
+    .map((b) => (b as { type: "text"; text: string }).text)
+    .join("");
+  if (!rawText) throw new Error("Claude returned no content");
+  return rawText;
+}
+
 export async function POST(req: NextRequest) {
   // Verify internal secret
   const auth = req.headers.get("authorization");
@@ -67,6 +134,16 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const claudeKey = process.env.ANTHROPIC_API_KEY;
+
+  if (!geminiKey && !claudeKey) {
+    return NextResponse.json(
+      { error: "No GEMINI_API_KEY or ANTHROPIC_API_KEY configured" },
+      { status: 500 }
+    );
+  }
 
   // Mark as processing
   await supabase
@@ -114,50 +191,29 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Call Claude Vision
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY!,
-    });
+    // Gemini first (free tier), Claude as fallback if Gemini fails and a key exists
+    let rawText: string;
+    let provider: string;
+    try {
+      if (geminiKey) {
+        rawText = await callGemini(geminiKey, imageBase64, mediaType);
+        provider = "gemini";
+      } else {
+        rawText = await callClaude(claudeKey!, imageBase64, mediaType);
+        provider = "claude";
+      }
+    } catch (primaryErr) {
+      if (geminiKey && claudeKey) {
+        rawText = await callClaude(claudeKey, imageBase64, mediaType);
+        provider = "claude-fallback";
+      } else {
+        throw primaryErr;
+      }
+    }
 
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: mediaType,
-                data: imageBase64,
-              },
-            },
-            {
-              type: "text",
-              text: AI_PROMPT,
-            },
-          ],
-        },
-      ],
-    });
-
-    const rawText = message.content
-      .filter((b) => b.type === "text")
-      .map((b) => (b as { type: "text"; text: string }).text)
-      .join("");
-
-    // Parse JSON — strip any accidental markdown fences
-    const jsonText = rawText
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```\s*$/, "")
-      .trim();
-
+    const jsonText = stripJsonFences(rawText);
     const parsed: unknown[] = JSON.parse(jsonText);
     const items = normaliseItems(parsed);
-
-    if (items.length === 0) throw new Error("AI returned no clothing items");
 
     // Replace existing clothing items so re-runs give a clean result.
     // Delete their matches first to satisfy foreign keys.
@@ -173,30 +229,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert new items
-    const { error: insertError } = await supabase.from("clothing_items").insert(
-      items.map((item) => ({
-        photo_id,
-        category: item.category,
-        color: item.color,
-        brand_guess: item.brand_guess,
-        description: item.description,
-        confidence: 0.85,
-        status: "draft",
-      }))
-    );
+    if (items.length > 0) {
+      const { error: insertError } = await supabase.from("clothing_items").insert(
+        items.map((item) => ({
+          photo_id,
+          category: item.category,
+          color: item.color,
+          brand_guess: item.brand_guess,
+          description: item.description,
+          confidence: 0.85,
+          status: "draft",
+        }))
+      );
 
-    if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
+      if (insertError) throw new Error(`Insert failed: ${insertError.message}`);
+    }
 
     // Mark done
+    const summary =
+      items.length === 0
+        ? `No clearly visible outfit in this image (${provider})`
+        : `Identified ${items.length} item${items.length === 1 ? "" : "s"} via ${provider}`;
+
     await supabase
       .from("photos")
-      .update({
-        ai_status: "done",
-        ai_summary: `Identified ${items.length} item${items.length === 1 ? "" : "s"}`,
-      })
+      .update({ ai_status: "done", ai_summary: summary })
       .eq("id", photo_id);
 
-    return NextResponse.json({ success: true, items_found: items.length });
+    return NextResponse.json({ success: true, provider, items_found: items.length });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     await supabase
