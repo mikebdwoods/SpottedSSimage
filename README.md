@@ -3,6 +3,11 @@
 Discover what UK celebrities are wearing and shop the look for less.
 Next.js 15 (App Router) + Supabase (`spotted-db`, project `pecwegnjigpayzsjvmif`) + Vercel.
 
+> **See [`PROJECT_STATUS.md`](./PROJECT_STATUS.md) for a current build vs.
+> open-issues snapshot** — what's actually live, current DB stats, and the
+> active list of known problems. This README covers architecture; that file
+> covers where things stand right now.
+
 ## How the site works
 
 **Visitor journey:** Homepage → Celebrity page → Photo (look) → Clothing item → Buy via retailer links.
@@ -39,12 +44,13 @@ Google News RSS ──(cron: every 2h)──▶ external_posts (7,400+ posts)
 
 - **`analyze_photo`** (Supabase edge function): downloads the photo, sends it
   to an AI vision model, parses identified clothing into `clothing_items`.
-  Tries **Gemini** (`gemini-2.0-flash`, free tier) first via `GEMINI_API_KEY`;
-  falls back to **Claude** (`claude-sonnet-4-6`) via `ANTHROPIC_API_KEY` if
-  Gemini fails and a Claude key is present. `ai_summary` records which
-  provider produced each result. Self-healing: billing/rate-limit/quota/API
-  errors return the photo to `pending` for automatic retry. With neither key
-  configured, photos stay `pending` — never fabricated placeholder data.
+  Tries **Gemini** (`gemini-2.5-flash`, free tier w/ billing enabled) first via
+  `GEMINI_API_KEY`; falls back to **Claude** (`claude-sonnet-4-6`) via
+  `ANTHROPIC_API_KEY` if Gemini fails and a Claude key is present. `ai_summary`
+  records which provider produced each result. Self-healing: billing/rate-limit/
+  quota/API errors return the photo to `pending` for automatic retry. With
+  neither key configured, photos stay `pending` — never fabricated placeholder
+  data.
 - **`match_products`**: scores products against each item (category synonyms +
   brand + colour); only creates matches with a genuine connection.
 - Photo statuses: `queued` → (`approved`) → `live` (public) / `hidden`.
