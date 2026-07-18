@@ -40,6 +40,17 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
+// Errors that will resolve themselves (billing top-up, rate limits, API
+// blips) put the photo back to 'pending' so the hourly cron retries it.
+function isRetryableApiError(msg: string): boolean {
+  return (
+    msg.includes("credit balance") ||
+    msg.includes("Claude API error 429") ||
+    msg.includes("Claude API error 5") ||
+    msg.includes("overloaded")
+  );
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -191,7 +202,13 @@ serve(async (req) => {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("[analyze_photo] Error:", msg);
     if (photoId) {
-      await supabase.from("photos").update({ ai_status: "error", ai_summary: msg.slice(0, 500) }).eq("id", photoId);
+      if (isRetryableApiError(msg)) {
+        // Transient (billing/rate limit/API blip): back to pending for the
+        // hourly cron to retry - keep the reason visible in ai_summary.
+        await supabase.from("photos").update({ ai_status: "pending", ai_summary: `Will retry: ${msg.slice(0, 400)}` }).eq("id", photoId);
+      } else {
+        await supabase.from("photos").update({ ai_status: "error", ai_summary: msg.slice(0, 500) }).eq("id", photoId);
+      }
     }
     return json({ error: msg }, 500);
   }
