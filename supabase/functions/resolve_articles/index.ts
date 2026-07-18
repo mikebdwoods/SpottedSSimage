@@ -33,6 +33,24 @@ function isBlockedImageHost(url: string): boolean {
   }
 }
 
+// Site-wide default/fallback share images (a publisher's platform-level
+// og:image, not the article's actual photo) - e.g. AOL/Yahoo articles all
+// resolve to the same s.yimg.com/.../og-image.png regardless of content.
+// Filename patterns, not hosts, since these live on otherwise-legitimate
+// publisher CDNs.
+const GENERIC_IMAGE_PATTERNS = [
+  /og-image/i,
+  /default[-_]?image/i,
+  /social[-_]?(share|card|default)/i,
+  /placeholder/i,
+  /fallback/i,
+  /\/logo[.\-_]/i,
+];
+
+function looksGeneric(url: string): boolean {
+  return GENERIC_IMAGE_PATTERNS.some((p) => p.test(url));
+}
+
 async function fetchWithTimeout(url: string, ms: number, init: RequestInit = {}): Promise<Response> {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), ms);
@@ -140,6 +158,7 @@ async function scrapeArticleImage(articleUrl: string): Promise<string | null> {
     else if (img.startsWith("/")) img = new URL(img, articleUrl).href;
     if (!img.startsWith("http")) continue;
     if (isBlockedImageHost(img)) continue;
+    if (looksGeneric(img)) continue;
     return img;
   }
   return null;
