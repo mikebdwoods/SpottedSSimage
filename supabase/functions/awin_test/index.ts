@@ -44,6 +44,40 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.clone().json();
+    if (typeof body?.gemini_search_test === "string") {
+      const key = Deno.env.get("GEMINI_API_KEY");
+      if (!key) return json({ error: "Missing GEMINI_API_KEY" }, 400);
+      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      // Grounded search calls can run past pg_net's 5s wait - write the
+      // result to a table so it can be polled instead of relying on the
+      // synchronous HTTP response. waitUntil keeps the isolate alive past
+      // the returned response.
+      const task = (async () => {
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: body.gemini_search_test }] }],
+                tools: [{ google_search: {} }],
+              }),
+            }
+          );
+          const data = await res.json();
+          await supabase.from("debug_log").insert({ label: "gemini_search_test", payload: { status: res.status, data } });
+        } catch (err) {
+          await supabase.from("debug_log").insert({
+            label: "gemini_search_test",
+            payload: { error: err instanceof Error ? err.message : String(err) },
+          });
+        }
+      })();
+      // deno-lint-ignore no-explicit-any
+      (globalThis as any).EdgeRuntime?.waitUntil(task);
+      return json({ started: true });
+    }
     if (Array.isArray(body?.fetch_urls)) {
       const results = [];
       for (const url of body.fetch_urls.slice(0, 15)) {
