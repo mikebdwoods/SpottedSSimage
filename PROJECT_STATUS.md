@@ -4,20 +4,20 @@ Snapshot date: **2026-07-18**. This file is the source of truth for "what's
 built" vs "what's still broken/missing." Update it whenever a major piece
 ships or a new issue is found — don't let it drift like the last one did.
 
-## Current database snapshot (live, queried 2026-07-18)
+## Current database snapshot (live, updated 2026-07-18 evening)
 
 | Metric | Value |
 |---|---|
-| Photos (total) | 5 — all `status='live'`, all `ai_status='done'` |
-| Celebrities | 42 total, **6 published** |
-| Clothing items | 26 |
-| Item matches | 16 |
-| Products (catalog) | 6 (seed data only) |
-| Merch products | 6 |
-| External posts (news feed) | 7,425 — **0 imported into photos** |
-| Comments | 0 |
-| Saved looks | 0 |
-| Newsletter signups | 1 |
+| Photos (total) | 194 — 22 `live`, 172 `queued`; 23 `ai_status=done`, 171 `pending` |
+| Celebrities | 42 total, 6 published |
+| Clothing items | 108 |
+| Item matches | 20 |
+| Products (catalog) | 11 (6 generic seed + 5 real END. products) |
+| External posts (news feed) | 7,425 — 190 now imported into photos (was 0 this morning) |
+| Celebrity brand affinity rows | 375 |
+
+(This morning's snapshot was 5 photos / 26 items / 6 products / 0 imported —
+the pipeline fixes shipped today changed all of this substantially.)
 
 The two numbers that matter most right now: **only 5 real photos exist**,
 and **none of the 7,425 scraped news posts have been imported yet**. Almost
@@ -173,6 +173,35 @@ branding off a jacket, "brat" merch text off a top).
 ---
 
 ## What still needs addressing
+
+### 0. ~~Looks not appearing despite "In the news" showing real photos~~ — FIXED (2026-07-18 evening)
+Not a pipeline bug — the auto-import from issue 1/3 below was working
+correctly, but every photo it creates lands as `status='queued'`
+(intentional editorial gate, admin must publish). Nobody had published
+anything yet, so celeb pages legitimately showed "0 looks" while photos
+piled up unpublished in the background. **Published the 17 photos that
+were fully AI-tagged with real identified clothing items** (excluded 3
+more that Gemini correctly flagged as "no clearly visible outfit" —
+right call, publishing those would've meant look pages with nothing on
+them). Confirmed: Dua Lipa now shows 7 live looks.
+
+**Also found and fixed while investigating**: 16 of those photos (and
+their `external_posts`) had been contaminated by a different
+Google-News-style bug — AOL.com articles all resolve to the *same*
+generic site-wide fallback image (`s.yimg.com/.../og-image.png`, AOL's
+default share card, not the actual article photo), which is exactly the
+blue "AOL.com" logo box the user's screenshot showed in "In the news".
+`resolve_articles`' `isBlockedImageHost` only blocked specific *hosts*
+(Google's icon domains); it had no defence against a legitimate
+publisher CDN serving a generic placeholder. Fixed with a
+`looksGeneric()` filename-pattern check (`og-image`, `default-image`,
+`social-share`, `placeholder`, `fallback`, bare `logo.*`) alongside the
+host blocklist. The 16 tainted photos (zero had real clothing_items —
+Gemini had already correctly rejected the ones it got to) were deleted
+and their posts reset to `resolve_status='no_image'` so they stop
+retrying. This class of bug — a publisher's platform-wide default image
+slipping through — will keep recurring per-publisher; the pattern list
+is a heuristic, not exhaustive.
 
 ### 1. ~~Site shows Google News icons instead of real photos~~ — ROOT CAUSE FOUND & FIXED (2026-07-18)
 The "junk" placeholder photos weren't seed data — they were the **Google
