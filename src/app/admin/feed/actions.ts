@@ -21,6 +21,21 @@ async function requireAdmin() {
   return supabase;
 }
 
+// Google News RSS only ever supplies its own logo as the "image" — a real
+// photo exists only after resolve_articles has decoded the publisher article
+// and scraped its og:image. Never let a placeholder become a photo.
+const PLACEHOLDER_IMAGE_HOSTS = ["lh3.googleusercontent.com", "news.google.com", "gstatic.com"];
+
+function hasRealImage(imageUrl: string | null): boolean {
+  if (!imageUrl) return false;
+  try {
+    const host = new URL(imageUrl).hostname;
+    return !PLACEHOLDER_IMAGE_HOSTS.some((b) => host === b || host.endsWith(`.${b}`));
+  } catch {
+    return false;
+  }
+}
+
 function fireAI(photoId: string) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
   const secret = process.env.INTERNAL_API_SECRET;
@@ -47,7 +62,9 @@ export async function importExternalPost(postId: string, runAI: boolean) {
 
   if (postError || !post) throw new Error(postError?.message ?? "Post not found");
   if (post.photo_id) throw new Error("Already imported");
-  if (!post.image_url) throw new Error("Post has no image");
+  if (!hasRealImage(post.image_url)) {
+    throw new Error("Post has no real photo yet — waiting on article resolution");
+  }
 
   const { data: photo, error: insertError } = await supabase
     .from("photos")
@@ -91,7 +108,7 @@ export async function importExternalPostBatch(postIds: string[], runAI: boolean)
       .eq("id", postId)
       .single();
 
-    if (!post || post.photo_id || !post.image_url) continue;
+    if (!post || post.photo_id || !hasRealImage(post.image_url)) continue;
 
     const { data: photo, error: insertError } = await supabase
       .from("photos")
