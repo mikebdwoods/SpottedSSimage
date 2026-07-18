@@ -27,37 +27,45 @@ day at 5 photos / 26 items / 6 products.
 
 In priority order, with reasoning. Items 0-2 are done; the rest are open.
 
-### 0. 🚨 Active infra incident — pg_cron jobs failing project-wide ("job startup timeout") — OPEN, discovered 2026-07-18 ~21:15 UTC
-Every single cron job on the project (`resolve-articles-every-5min`,
-`analyze-photos-every-10min`, `match-products-every-15min`,
-`source-products-every-20min`, `ingest-queue-every-30min`,
-`process-ingest-queue`) has been failing back-to-back with
-`return_message: "job startup timeout"` continuously since at least
-19:50 UTC (checked as far back as that; may have started earlier) —
-confirmed still failing as of 21:30 UTC, over 90 minutes. **The entire
-automated pipeline is stalled**: zero new photos created since 21:15:51
-UTC despite ~5,000 unresolved posts in the backlog.
+### 0. 🚨 Infra incident — pipeline stalled ("job startup timeout" + wedged pg_net worker) — PARTIALLY FIXED, still monitoring (2026-07-18 evening)
+Every cron job on the project was failing back-to-back with
+`return_message: "job startup timeout"` from ~19:50 UTC (possibly
+earlier) — the entire automated pipeline stalled, zero new photos
+despite ~5,000 unresolved posts waiting.
 
-Investigated: not a code issue (started well before today's
-`resolve_articles` v5 deploy, and hits every job type equally, not just
-one function). Not connection-pool exhaustion (`pg_stat_activity` shows
-only ~22 connections, nowhere near a limit). `net.http_request_queue` is
-empty (not a backed-up pg_net queue). Postgres logs show a cluster of
-`"canceling statement due to statement timeout"` errors around the same
-window. Likely candidate: `max_worker_processes = 6` /
-`max_parallel_workers = 2` — pg_cron's dynamic per-job background
-workers share that same small pool with autovacuum, logical
-replication, and the `pg_net` worker, and `cron.max_running_jobs = 32`
-implies far more concurrency headroom than 6 worker-process slots can
-actually provide. This looks like a Supabase-platform-level resource
-ceiling for this project's compute tier, not something fixable via SQL
-from the client side (no invasive fix — e.g. restarting/pausing the
-project — was attempted; that's a call for the project owner, not
-something to do unilaterally on live production infra).
+**Root cause 1 — cron worker-slot collisions (FIXED 21:45 UTC):** every
+schedule was anchored to minute :00 (`*/5`, `*/10`, `*/15`, `*/20`,
+`*/30` all count from 0), so at marks like :00/:30 up to 6 jobs fired in
+the same instant, each demanding a dynamic pg_cron background-worker
+slot. The project has `max_worker_processes = 6` with ~4 slots
+permanently held (autovacuum, pg_cron launcher, pg_net worker, logical
+replication launcher) — losers of the race die with "job startup
+timeout" before their work even starts. Fixed by migration
+`stagger_cron_schedules_to_avoid_worker_collision`: every job now has
+its own minute offset (resolve `1-59/5`, analyze `3-59/10`, match
+`7-59/15`, source `9-59/10`, ingest `18,48` / `28,58`) so no two jobs
+are ever due in the same minute. Verified recovering: first successful
+runs at 21:53/21:56 UTC after 2+ hours of failures.
 
-**Next step: needs Supabase support/dashboard investigation, or simply
-monitoring to see if it self-clears.** Until it does, the pipeline is
-effectively paused — nothing downstream of this is going to move.
+**Root cause 2 — wedged pg_net worker (MITIGATION APPLIED, awaiting
+confirmation):** even after crons started succeeding, their work wasn't
+landing — a cron run only *queues* an HTTP request via `net.http_post`;
+delivery is done by the single pg_net background worker, and that worker
+(pid running for 172 days) was holding transactions open for 30+ minutes
+at a time, delivering nothing and making `net._http_response` queries
+hang. `select net.worker_restart()` was issued (returns true, takes
+effect when the worker's current cycle ends); `pg_terminate_backend` is
+not available to the client role (worker runs as superuser). If the
+worker doesn't recover on its own, the remaining remedy is a **project
+restart from the Supabase dashboard** (Settings → General → Restart
+project) — needs the owner, ~1 min of downtime.
+
+**Bigger picture:** both failure modes trace to the same thing — the
+project's compute tier allots very few background-worker slots and one
+easily-overwhelmed pg_net worker, while the pipeline now runs 8 cron
+jobs and hundreds of edge-function calls a day. If these incidents
+recur, the durable fix is a compute upgrade in the Supabase dashboard
+(paid; owner decision).
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
@@ -104,13 +112,51 @@ with the fix being correct and simply not yet exercised, not with it
 being broken. Re-check once item 0 clears and the resolver is running
 again.
 
-### 3. Publish more celebrities (instant breadth, near-zero work)
-Only 6 of 42 celebrities are published, but the pipeline is importing
-content for all of them — the other 36 have looks piling up invisibly.
-Either review + publish manually in `/admin/celebrities`, or (consistent
-with the auto-publish philosophy) auto-publish any celebrity once they
-have ≥3 live looks and a profile photo. The second is a small change to
-the pipeline and keeps everything hands-off.
+### 2b. Exact product + cheaper alternatives per item — SHIPPED 2026-07-18 late night (backlog draining, gated on item 0)
+User's core product requirement, stated explicitly: *"I need to be
+seeing the exact clothes and the two or three cheaper alternatives for
+each item."* State when this landed: of 957 shoppable items on live
+looks of published celebs, only 244 had any product match at all and
+exactly **1** had an `exact` match — structurally impossible to deliver
+the requirement with one-product-per-item sourcing and a 32-product
+catalog.
+
+What shipped:
+- **`source_products` v4**: one grounded-Gemini call per item now asks
+  for (a) the EXACT product — brand + product name, null when not
+  identifiable with confidence, never guessed — and (b) 2-3 CHEAPER
+  UK high-street alternatives (ASOS, M&S, New Look, River Island,
+  Mango, Next, Uniqlo, H&M, Missoma, END. steered in the prompt). Every
+  candidate URL still independently verified (direct fetch → Jina
+  proxy) before insertion. Verified products get `item_matches` written
+  directly: exact → `match_type='exact'`/primary/0.95, alternatives →
+  `match_type='dupe'`/0.7. The celebrity's name is passed into the
+  search prompt to help pin the exact garment (press coverage often
+  names it).
+- **Live-first queue**: sourcing works items on live photos of
+  published celebrities before anything else; the ~21 live items
+  attempted under the old logic were reset for re-sourcing.
+- **Cron sped up**: `source-products-every-10min` (offset 9, batch 3)
+  replaces the 20-min job — ~432 items/day, live backlog (~950 items)
+  done in ~2 days once the pipeline is moving.
+- **Item page rebuilt** around the requirement: "The exact one" (hero
+  section with "As worn by {celeb}" badge) → "Get the look for less"
+  sorted cheapest-first → "More like this" for generic matches. A
+  "dupe" whose real page price turns out ≥ the exact price is demoted
+  out of the "for less" section so it never lies.
+
+**Verification pending**: the single-item live test was queued but the
+wedged pg_net worker (item 0, root cause 2) hasn't delivered it yet.
+First thing to check when the pipeline moves: `debug_log`
+(`label='source_products'`) payloads now show `exact` and `dupes`
+fields per item.
+
+### 3. Publish more celebrities — DEFERRED by user decision (2026-07-18)
+User: *"I don't think we should publish more celebs until we have the
+system working for the few we already have live."* Revisit once item 2b
+has demonstrably filled the live catalog (exact + alternatives showing
+on most live items). The original options (manual review vs
+auto-publish at ≥3 live looks + profile photo) still stand.
 
 ### 4. Affiliate revenue (user action required first)
 Every product link is currently a plain retailer link earning nothing.
