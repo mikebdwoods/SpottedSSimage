@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { MobileNav } from "./mobile-nav";
@@ -21,15 +22,15 @@ export async function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+    <header className="sticky top-0 z-40 w-full border-b border-border/80 bg-background/85 backdrop-blur-md supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-black tracking-tight">
+          <Link href="/" className="font-serif italic text-2xl tracking-tight">
             Spotted
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden sm:flex items-center gap-2">
+          <nav className="hidden sm:flex items-center gap-1">
             <Link href="/celebrities">
               <Button variant="ghost" size="sm">Celebrities</Button>
             </Link>
@@ -43,10 +44,8 @@ export async function Navbar() {
               <Button variant="ghost" size="sm">News</Button>
             </Link>
             <Link href="/search" aria-label="Search">
-              <Button variant="ghost" size="sm" className="px-2.5">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+              <Button variant="ghost" size="icon">
+                <Search className="h-4 w-4" />
               </Button>
             </Link>
             {isAdmin && (
@@ -66,8 +65,8 @@ export async function Navbar() {
                 </form>
               </>
             ) : (
-              <Link href="/auth/login">
-                <Button variant="ghost" size="sm">Sign in</Button>
+              <Link href="/auth/login" className="ml-1">
+                <Button variant="default" size="sm">Sign in</Button>
               </Link>
             )}
           </nav>

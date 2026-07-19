@@ -61,37 +61,30 @@ export default async function NewsPage({
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-black text-white py-12 px-4 relative overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
+      <div className="relative bg-primary text-primary-foreground texture-grain py-12 px-4 overflow-hidden">
+        <div className="pointer-events-none absolute -top-16 right-10 h-56 w-56 rounded-full bg-clay/15 blur-3xl" />
         <div className="relative mx-auto max-w-7xl">
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-primary-foreground/50 uppercase tracking-widest mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-clay animate-pulse" />
             Updated daily
           </div>
-          <h1 className="text-4xl font-black tracking-tight mb-2">
+          <h1 className="font-serif italic text-4xl sm:text-5xl tracking-tight mb-2">
             {activeCeleb ? `${activeCeleb.name} News` : "Celebrity News"}
           </h1>
-          <p className="text-gray-400 text-sm">
+          <p className="text-primary-foreground/60 text-sm">
             The latest looks and stories from around the web
           </p>
         </div>
       </div>
 
       {/* Celebrity filter */}
-      <div className="border-b bg-white sticky top-16 z-20">
+      <div className="border-b border-border bg-background/95 backdrop-blur sticky top-16 z-20">
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide">
             <Link
               href="/news"
               className={`shrink-0 text-xs font-semibold border rounded-full px-3 py-1.5 transition-colors ${
-                !celebFilter ? "bg-black text-white border-black" : "hover:bg-gray-50"
+                !celebFilter ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"
               }`}
             >
               All
@@ -102,8 +95,8 @@ export default async function NewsPage({
                 href={buildHref({ celeb: c.slug })}
                 className={`shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 transition-colors whitespace-nowrap ${
                   celebFilter === c.slug
-                    ? "bg-black text-white border-black"
-                    : "hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-secondary"
                 }`}
               >
                 {c.name}
@@ -135,7 +128,7 @@ export default async function NewsPage({
                     rel="noopener noreferrer"
                     className="group flex flex-col"
                   >
-                    <div className="aspect-[4/3] relative overflow-hidden rounded-xl bg-gray-100 mb-3">
+                    <div className="aspect-[4/3] relative overflow-hidden rounded-2xl bg-secondary shadow-warm mb-3">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={post.image_url ?? ""}
@@ -173,7 +166,7 @@ export default async function NewsPage({
               {currentPage > 1 && (
                 <Link
                   href={buildHref({ celeb: celebFilter, page: currentPage - 1 })}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-full px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   ← Prev
                 </Link>
@@ -184,7 +177,7 @@ export default async function NewsPage({
               {currentPage < totalPages && (
                 <Link
                   href={buildHref({ celeb: celebFilter, page: currentPage + 1 })}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-full px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   Next →
                 </Link>

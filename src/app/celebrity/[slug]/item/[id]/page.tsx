@@ -80,10 +80,10 @@ function ProductCard({ match, celebName }: { match: Match; celebName: string }) 
       href={product.product_url ?? "#"}
       target="_blank"
       rel="noopener noreferrer"
-      className="group flex flex-col border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+      className="group flex flex-col border border-border bg-card rounded-2xl overflow-hidden shadow-warm hover:shadow-warm-lg hover:border-clay/30 transition-all"
     >
       {/* Product image */}
-      <div className="aspect-square relative overflow-hidden bg-gray-100">
+      <div className="aspect-square relative overflow-hidden bg-secondary">
         {product.image_url ? (
           <Image
             src={product.image_url}
@@ -94,17 +94,17 @@ function ProductCard({ match, celebName }: { match: Match; celebName: string }) 
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ShoppingBag className="h-8 w-8 text-gray-300" />
+            <ShoppingBag className="h-8 w-8 text-muted-foreground/40" />
           </div>
         )}
         {match.match_type === "exact" && (
-          <div className="absolute top-2 left-2 bg-black text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+          <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs font-semibold px-2 py-0.5 rounded-full">
             Exact match
           </div>
         )}
         {match.match_type === "celebrity_style_guess" && (
           <div
-            className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed"
+            className="absolute top-2 left-2 bg-card/90 text-foreground text-xs font-semibold px-2 py-0.5 rounded-full border border-dashed border-border"
             title={`No visible brand markings — suggested based on ${celebName}'s known style`}
           >
             Style guess
@@ -114,23 +114,23 @@ function ProductCard({ match, celebName }: { match: Match; celebName: string }) 
           match.match_type !== "exact" &&
           match.match_type !== "celebrity_style_guess" &&
           (match.score ?? 0) >= CONFIDENT_MATCH_SCORE && (
-            <div className="absolute top-2 left-2 bg-white/90 text-black text-xs font-semibold px-2 py-0.5 rounded-full border">
+            <div className="absolute top-2 left-2 bg-card/90 text-foreground text-xs font-semibold px-2 py-0.5 rounded-full border border-border">
               Top pick
             </div>
           )}
       </div>
 
       {/* Product info */}
-      <div className="p-3 flex flex-col flex-1">
+      <div className="p-3.5 flex flex-col flex-1">
         <p className="text-sm font-semibold line-clamp-2 flex-1">{product.title}</p>
         <p className="text-xs text-muted-foreground mt-0.5">
           {[product.brand, product.retailer].filter(Boolean).join(" · ")}
         </p>
-        <div className="flex items-center justify-between mt-3 pt-3 border-t">
-          <p className="text-base font-black">
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+          <p className="text-base font-bold font-serif">
             {product.price != null ? formatPrice(Number(product.price)) : "See price"}
           </p>
-          <span className="flex items-center gap-1 text-xs font-semibold text-primary">
+          <span className="flex items-center gap-1 text-xs font-semibold text-clay">
             Buy
             <ExternalLink className="h-3 w-3" />
           </span>
@@ -208,7 +208,7 @@ export default async function ClothingItemPage({
   return (
     <div className="min-h-screen">
       {/* Sticky breadcrumb header */}
-      <div className="sticky top-16 z-30 bg-white/95 backdrop-blur border-b py-3 px-4">
+      <div className="sticky top-16 z-30 bg-background/95 backdrop-blur border-b border-border py-3 px-4">
         <div className="mx-auto max-w-5xl flex items-center justify-between gap-4">
           <Link
             href={`/celebrity/${slug}/photo/${item.photo_id}`}
@@ -232,14 +232,14 @@ export default async function ClothingItemPage({
           <div className="mb-10">
             <div className="flex items-start gap-4 flex-wrap">
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                <p className="text-xs font-semibold text-clay uppercase tracking-[0.15em] mb-1.5">
                   {celeb.name}
                 </p>
-                <h1 className="text-3xl font-black tracking-tight capitalize">
+                <h1 className="font-serif italic text-4xl tracking-tight capitalize">
                   {item.category}
                 </h1>
                 {item.description && (
-                  <p className="text-muted-foreground mt-2 max-w-xl">
+                  <p className="text-muted-foreground mt-2.5 max-w-xl">
                     {item.description}
                   </p>
                 )}
@@ -249,22 +249,22 @@ export default async function ClothingItemPage({
             {/* Tags */}
             <div className="flex gap-2 mt-4 flex-wrap">
               {item.color && (
-                <span className="inline-flex items-center gap-1.5 border rounded-full px-3 py-1 text-sm capitalize">
+                <span className="inline-flex items-center gap-1.5 border border-border rounded-full px-3 py-1 text-sm capitalize bg-card">
                   <span
-                    className="w-3 h-3 rounded-full border border-gray-200"
+                    className="w-3 h-3 rounded-full border border-border"
                     style={{ background: item.color.toLowerCase() }}
                   />
                   {item.color}
                 </span>
               )}
               {item.brand_guess && (
-                <span className="border rounded-full px-3 py-1 text-sm font-medium">
+                <span className="border border-border rounded-full px-3 py-1 text-sm font-medium bg-card">
                   {item.brand_guess}
                 </span>
               )}
               {!item.brand_guess && item.inferred_brand && (
                 <span
-                  className="border border-dashed rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"
+                  className="border border-dashed border-border rounded-full px-3 py-1 text-sm font-medium text-muted-foreground"
                   title={`No visible brand markings — likely brand based on ${celeb.name}'s known style`}
                 >
                   Possibly {item.inferred_brand}
@@ -275,7 +275,7 @@ export default async function ClothingItemPage({
 
           {/* Product Matches */}
           {!hasMatches ? (
-            <div className="text-center py-20 border-2 border-dashed rounded-2xl text-muted-foreground">
+            <div className="text-center py-20 border-2 border-dashed border-border rounded-2xl text-muted-foreground bg-secondary/30">
               <ShoppingBag className="h-10 w-10 mx-auto mb-3 opacity-30" />
               <p className="text-lg font-semibold mb-1">No matches yet</p>
               <p className="text-sm">
@@ -288,8 +288,8 @@ export default async function ClothingItemPage({
               {exactMatch && (
                 <div>
                   <div className="flex items-center gap-3 mb-5">
-                    <h2 className="text-xl font-bold">The exact one</h2>
-                    <span className="text-xs font-semibold border rounded-full px-2.5 py-0.5 bg-black text-white">
+                    <h2 className="font-serif italic text-2xl tracking-tight">The exact one</h2>
+                    <span className="text-xs font-semibold rounded-full px-2.5 py-0.5 bg-primary text-primary-foreground">
                       As worn by {celeb.name}
                     </span>
                   </div>
@@ -303,10 +303,10 @@ export default async function ClothingItemPage({
               {cheaperAlternatives.length > 0 && (
                 <div>
                   <div className="flex items-center gap-3 mb-5">
-                    <h2 className="text-xl font-bold">
+                    <h2 className="font-serif italic text-2xl tracking-tight">
                       {exactMatch ? "Get the look for less" : "Get the look"}
                     </h2>
-                    <span className="text-xs font-semibold border rounded-full px-2.5 py-0.5 bg-green-50 text-green-800 border-green-200">
+                    <span className="text-xs font-semibold rounded-full px-2.5 py-0.5 bg-clay-soft text-clay-soft-foreground">
                       {exactMatch ? "Cheaper alternatives" : "Verified matches"}
                     </span>
                   </div>
@@ -322,7 +322,7 @@ export default async function ClothingItemPage({
               {otherMatches.length > 0 && (
                 <div>
                   <div className="flex items-center gap-3 mb-5">
-                    <h2 className="text-xl font-bold">More like this</h2>
+                    <h2 className="font-serif italic text-2xl tracking-tight">More like this</h2>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {otherMatches.map((match) => (
@@ -338,7 +338,7 @@ export default async function ClothingItemPage({
 
       {/* More from this celebrity */}
       {moreLooks && moreLooks.length > 0 && (
-        <section className="py-12 px-4 bg-gray-50 border-t">
+        <section className="py-12 px-4 bg-secondary/40 border-t border-border">
           <div className="mx-auto max-w-5xl">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold">More from {celeb.name}</h2>
@@ -356,7 +356,7 @@ export default async function ClothingItemPage({
                   href={`/celebrity/${slug}/photo/${look.id}`}
                   className="group"
                 >
-                  <div className="aspect-[3/4] relative overflow-hidden rounded-lg bg-gray-200">
+                  <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-secondary shadow-warm">
                     {look.image_url ? (
                       <Image
                         src={look.image_url}
@@ -366,7 +366,7 @@ export default async function ClothingItemPage({
                         sizes="(max-width: 640px) 50vw, 25vw"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                         No image
                       </div>
                     )}

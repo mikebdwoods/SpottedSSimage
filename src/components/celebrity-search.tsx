@@ -41,7 +41,7 @@ export function CelebritySearch({ celebrities }: Props) {
   return (
     <div ref={containerRef} className="relative w-full max-w-sm mx-auto">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <input
           ref={inputRef}
           type="text"
@@ -52,12 +52,12 @@ export function CelebritySearch({ celebrities }: Props) {
           }}
           onFocus={() => setOpen(true)}
           placeholder="Search celebrities..."
-          className="w-full pl-9 pr-8 py-2.5 rounded-full border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-black/20 transition-shadow"
+          className="w-full pl-9 pr-8 py-2.5 rounded-full border border-border bg-card text-sm shadow-warm focus:outline-none focus:ring-2 focus:ring-clay/30 focus:border-clay transition-shadow"
         />
         {query && (
           <button
             onClick={() => { setQuery(""); inputRef.current?.focus(); }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
@@ -65,15 +65,15 @@ export function CelebritySearch({ celebrities }: Props) {
       </div>
 
       {open && results.length > 0 && (
-        <div className="absolute top-full mt-2 left-0 right-0 bg-white border rounded-xl shadow-lg overflow-hidden z-30">
+        <div className="absolute top-full mt-2 left-0 right-0 bg-card border border-border rounded-xl shadow-warm-lg overflow-hidden z-30">
           {results.slice(0, 6).map((celeb) => (
             <Link
               key={celeb.id}
               href={`/celebrity/${celeb.slug}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-secondary transition-colors"
               onClick={() => { setOpen(false); setQuery(""); }}
             >
-              <div className="relative w-8 h-8 rounded-full overflow-hidden bg-gray-200 shrink-0">
+              <div className="relative w-8 h-8 rounded-full overflow-hidden bg-secondary shrink-0">
                 {celeb.image_url ? (
                   <Image
                     src={celeb.image_url}
@@ -83,7 +83,7 @@ export function CelebritySearch({ celebrities }: Props) {
                     sizes="32px"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-400">
+                  <div className="w-full h-full flex items-center justify-center text-xs font-bold text-muted-foreground">
                     {celeb.name.charAt(0)}
                   </div>
                 )}
@@ -95,7 +95,7 @@ export function CelebritySearch({ celebrities }: Props) {
       )}
 
       {open && query.trim() && results.length === 0 && (
-        <div className="absolute top-full mt-2 left-0 right-0 bg-white border rounded-xl shadow-lg px-4 py-3 text-sm text-muted-foreground z-30">
+        <div className="absolute top-full mt-2 left-0 right-0 bg-card border border-border rounded-xl shadow-warm-lg px-4 py-3 text-sm text-muted-foreground z-30">
           No celebrities found for &ldquo;{query}&rdquo;
         </div>
       )}

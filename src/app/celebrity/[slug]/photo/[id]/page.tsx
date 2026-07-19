@@ -107,7 +107,7 @@ export default async function PhotoPage({
         <div className="grid md:grid-cols-2 gap-8">
           {/* Photo */}
           <div>
-            <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100">
+            <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-secondary shadow-warm-lg">
               {photo.image_url ? (
                 <Image
                   src={photo.image_url}
@@ -118,7 +118,7 @@ export default async function PhotoPage({
                   priority
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   No image available
                 </div>
               )}
@@ -127,7 +127,10 @@ export default async function PhotoPage({
 
           {/* Clothing Items */}
           <div id="clothing-items">
-            <h1 className="text-xl font-bold mb-1">{celeb.name}</h1>
+            <p className="text-xs font-semibold tracking-[0.15em] text-clay uppercase mb-1.5">
+              {celeb.name}
+            </p>
+            <h1 className="font-serif italic text-3xl tracking-tight mb-1">Shop this look</h1>
             <p className="text-muted-foreground text-sm mb-6">
               {new Date(photo.created_at).toLocaleDateString("en-GB", {
                 day: "numeric",
@@ -152,7 +155,7 @@ export default async function PhotoPage({
                   <Link
                     key={item.id}
                     href={`/celebrity/${slug}/item/${item.id}`}
-                    className="block border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                    className="group block border border-border bg-card rounded-2xl p-4 hover:border-clay/40 hover:shadow-warm transition-all"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -175,7 +178,7 @@ export default async function PhotoPage({
                           )}
                         </div>
                       </div>
-                      <span className="text-sm text-primary font-medium shrink-0">
+                      <span className="text-sm text-clay font-semibold shrink-0 group-hover:translate-x-0.5 transition-transform">
                         Shop →
                       </span>
                     </div>
@@ -199,7 +202,7 @@ export default async function PhotoPage({
 
       {/* Mobile sticky CTA */}
       {itemCount > 0 && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t px-4 py-3 flex items-center gap-3">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex items-center gap-3 shadow-warm-lg">
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground">
               {celeb.name}&apos;s look
@@ -210,7 +213,7 @@ export default async function PhotoPage({
           </div>
           <a
             href="#clothing-items"
-            className="bg-black text-white text-sm font-semibold px-5 py-2.5 rounded-lg hover:bg-gray-800 transition-colors shrink-0"
+            className="bg-primary text-primary-foreground text-sm font-semibold px-5 py-2.5 rounded-full hover:bg-primary/88 transition-colors shrink-0"
           >
             Shop the look
           </a>

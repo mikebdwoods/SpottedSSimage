@@ -39,7 +39,7 @@ export default function UnsubscribePage() {
         </p>
 
         {status === "done" ? (
-          <div className="rounded-xl border bg-gray-50 p-6">
+          <div className="rounded-2xl border border-border bg-secondary/40 p-6">
             <p className="font-semibold mb-1">You&apos;re unsubscribed</p>
             <p className="text-sm text-muted-foreground">{message}</p>
           </div>

@@ -1,7 +1,7 @@
 export default function NewsLoading() {
   return (
     <div className="min-h-screen">
-      <div className="bg-black py-12 px-4">
+      <div className="bg-primary py-12 px-4">
         <div className="mx-auto max-w-7xl">
           <div className="h-3 w-24 bg-gray-800 rounded mb-4 animate-pulse" />
           <div className="h-9 w-64 bg-gray-800 rounded mb-2 animate-pulse" />

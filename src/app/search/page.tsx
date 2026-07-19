@@ -55,11 +55,11 @@ export default async function SearchPage({
               defaultValue={query}
               placeholder="Search celebrities, outfits, brands..."
               autoFocus
-              className="flex-1 border rounded-xl px-5 py-3.5 text-base focus:outline-none focus:ring-2 focus:ring-black"
+              className="flex-1 border border-border rounded-2xl px-5 py-3.5 text-base bg-card shadow-warm focus:outline-none focus:ring-2 focus:ring-clay/30 focus:border-clay"
             />
             <button
               type="submit"
-              className="bg-black text-white px-6 py-3.5 rounded-xl font-semibold text-sm hover:bg-gray-800 transition-colors shrink-0"
+              className="bg-primary text-primary-foreground px-6 py-3.5 rounded-2xl font-semibold text-sm hover:bg-primary/88 transition-colors shrink-0"
             >
               Search
             </button>
@@ -77,15 +77,15 @@ export default async function SearchPage({
             {/* Celebrities */}
             {celebrities && celebrities.length > 0 && (
               <section className="mb-12">
-                <h2 className="text-lg font-bold mb-5">Celebrities</h2>
+                <h2 className="font-serif italic text-2xl tracking-tight mb-5">Celebrities</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {celebrities.map((celeb) => (
                     <Link
                       key={celeb.id}
                       href={`/celebrity/${celeb.slug}`}
-                      className="group flex flex-col items-center text-center p-4 border rounded-xl hover:bg-gray-50 transition-colors"
+                      className="group flex flex-col items-center text-center p-4 border border-border rounded-2xl bg-card hover:border-clay/40 hover:shadow-warm transition-all"
                     >
-                      <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gray-200 mb-3">
+                      <div className="relative w-16 h-16 rounded-full overflow-hidden bg-secondary mb-3">
                         {celeb.photo_url ? (
                           <Image
                             src={celeb.photo_url}
@@ -95,7 +95,7 @@ export default async function SearchPage({
                             sizes="64px"
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-400">
+                          <div className="w-full h-full flex items-center justify-center text-xl font-serif italic text-muted-foreground">
                             {celeb.name.charAt(0)}
                           </div>
                         )}
@@ -115,7 +115,7 @@ export default async function SearchPage({
             {/* Items / Looks */}
             {photos && photos.length > 0 && (
               <section>
-                <h2 className="text-lg font-bold mb-5">Clothing Items</h2>
+                <h2 className="font-serif italic text-2xl tracking-tight mb-5">Clothing Items</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {photos.map((item) => {
                     const photo = item.photos as unknown as {
@@ -129,9 +129,9 @@ export default async function SearchPage({
                       <Link
                         key={item.id}
                         href={`/celebrity/${celeb.slug}/item/${item.id}`}
-                        className="group border rounded-xl overflow-hidden hover:shadow-md transition-shadow"
+                        className="group border border-border bg-card rounded-2xl overflow-hidden shadow-warm hover:shadow-warm-lg hover:border-clay/30 transition-all"
                       >
-                        <div className="aspect-[3/4] relative overflow-hidden bg-gray-100">
+                        <div className="aspect-[3/4] relative overflow-hidden bg-secondary">
                           {photo.image_url ? (
                             <Image
                               src={photo.image_url}
@@ -141,7 +141,7 @@ export default async function SearchPage({
                               sizes="(max-width: 640px) 50vw, 25vw"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                               No image
                             </div>
                           )}
@@ -181,13 +181,13 @@ export default async function SearchPage({
                 <a
                   key={hint}
                   href={`/search?q=${encodeURIComponent(hint)}`}
-                  className="text-xs border rounded-full px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                  className="text-xs border border-border rounded-full px-3 py-1.5 hover:border-clay hover:text-clay transition-colors"
                 >
                   {hint}
                 </a>
               ))}
             </div>
-            <div className="border-t pt-8">
+            <div className="border-t border-border pt-8">
               <p className="text-sm font-semibold mb-4 text-foreground">Browse by category</p>
               <div className="flex flex-wrap gap-2">
                 {[
@@ -205,7 +205,7 @@ export default async function SearchPage({
                   <Link
                     key={slug}
                     href={`/category/${slug}`}
-                    className="text-xs border rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors font-medium"
+                    className="text-xs border border-border rounded-full px-3 py-1.5 hover:border-clay hover:text-clay transition-colors font-medium"
                   >
                     {label}
                   </Link>
