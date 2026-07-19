@@ -1,25 +1,27 @@
 # Spotted — Project Status
 
-Snapshot date: **2026-07-18**. This file is the source of truth for "what's
+Snapshot date: **2026-07-19**. This file is the source of truth for "what's
 built" vs "what's still broken/missing." Update it whenever a major piece
 ships or a new issue is found — don't let it drift like the last one did.
 
-## Current database snapshot (live, updated 2026-07-18 ~14:40 UTC — ⚠️ pipeline has been stalled since ~19:50 UTC, see roadmap item 0; numbers below stopped moving around 21:15 UTC)
+## Current database snapshot (live, updated 2026-07-19 ~14:00 UTC — ⏸️ pipeline intentionally paused for quality rebuild since ~04:15 UTC, see roadmap item 0c; numbers below are frozen except the debug_log/ops-hygiene crons which still run)
 
 | Metric | Value |
 |---|---|
-| Photos (total) | 1,077 — 118 `live` (auto-published), 959 `queued`; 954 still `ai_status=pending` |
-| Celebrities | 42 total, 6 published |
-| Clothing items | 504 (sourcing: 498 unattempted, 3 sourced, 1 no_source, 2 error — cron just started) |
-| Item matches | 302 |
-| Products (catalog) | 19 (6 generic seed + 13 real, auto-sourcing now adding more continuously) |
-| External posts | 7,425 — 1,096 resolved w/ real photo, 731 no usable image, 5,591 still queued (~19h left) |
-| Celebrity brand affinity rows | 375 |
+| Photos (total) | 2,104 — 443 `live`/`approved`, 1,661 `queued`; 1,632 still `ai_status=pending`, 12 `ai_status=error` (dead source images, see item 0k) |
+| Celebrities | 41 total, 6 published (News Feed placeholder deleted, item 0k) |
+| Clothing items | 1,710 (sourcing: 1,658 unattempted, 19 sourced, 9 no_source, 24 error) |
+| Item matches | 7 (post-purge — only verified `exact`/`dupe`/`same_brand` remain, see item 0c/0j) |
+| Products (catalog) | 34 |
+| External posts | 7,460 — 2,286 resolved w/ real photo, 1,616 no usable image, 3,513 still queued |
+| Celebrity brand affinity rows | 446 |
 
-All growth is the automated pipeline (resolve → import → AI-tag →
-auto-publish → source → match) running by itself. This table is stale the
-moment it's written; treat it as a point-in-time reference. Started the
-day at 5 photos / 26 items / 6 products.
+Growth stopped when the pipeline was paused (item 0c) — these numbers
+won't move again until `GOOGLE_CSE_KEY`/`GOOGLE_CSE_CX` land and AI
+budget is restored (items 0g/0b), the search-first `source_products`
+rewrite (item 0j) is proven on a small test batch, and the resolve/
+analyze/match/source crons are explicitly re-enabled. Treat this table
+as a point-in-time reference, not a live figure, until then.
 
 ---
 
@@ -386,6 +388,41 @@ days. Ops hygiene item 7; zero AI cost, safe regardless of pause state.
 Google Lens/SerpAPI reverse-image search for logo-less items (item 0c's
 "optional" step 2) and retailer sitemap bulk-ingestion. Both remain
 valid follow-ups once the core search+verify+vision loop is proven.
+
+### 0k. Small ops-hygiene pass — 2026-07-19
+Worked through the remaining low-priority items (roadmap 6/7) that
+don't need AI budget, new secrets, or a user decision:
+
+- **SEO scaffolding reviewed, already solid** — `sitemap.ts` covers
+  every published celebrity, live/approved photo (last 500), all 17
+  category pages, and the static pages; `robots.txt` correctly blocks
+  `/admin/` and `/auth/`; celebrity/photo/item/category pages already
+  have `generateMetadata` with dynamic OpenGraph + Twitter card images
+  via `/api/og`. Nothing needed fixing.
+- **Vercel MCP connector in this session points at an unrelated
+  project** (`mouldpros-lfkc` / mouldpros.co.uk, same Vercel team)
+  rather than Spotted — worth knowing before trusting any
+  Vercel-tool-reported domain/deployment info for this site.
+  `sitemap.ts`/`robots.ts` already read `NEXT_PUBLIC_SITE_URL`
+  correctly; whether that's set to the right value on the real Spotted
+  Vercel project couldn't be verified from here.
+- **The "News Feed" placeholder celebrity — DELETED.** Confirmed zero
+  references anywhere first (0 photos, 0 external_posts, 0
+  brand-affinity rows) — it wasn't even acting as a catch-all for
+  unattributed content, just an inert row. 42 celebrities → 41.
+- **The 12 `ai_status='error'` photos — reviewed, left alone.** All are
+  genuine dead image URLs (HTTP 403/404/406/502, one connection reset)
+  that failed before AI ever ran — not an AI-budget problem, not
+  fixable by retrying. None have `clothing_items` and none are
+  `status='live'`, so they're invisible publicly; each is still linked
+  from exactly one `external_posts` row. There's no foreign key between
+  `external_posts.photo_id` and `photos.id` (consistent with other
+  missing-constraint gaps found earlier this project), and
+  `resolve_articles` only reprocesses posts with `resolve_status is
+  null`, so deleting these photos wouldn't cause a re-import loop — but
+  the cleanup value is marginal (12 invisible rows) versus the small
+  risk of leaving a dangling reference some future feature might not
+  expect, so left as-is rather than force a low-value change.
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
