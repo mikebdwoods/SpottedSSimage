@@ -155,6 +155,101 @@ visually-searchable alternatives catalog. Staged rollout: test on the
 known-failing looks first (pennies), then one capped day (~£2-3), then
 drain the backlog.
 
+### 0d. Site-wide visual redesign shipped — 2026-07-19
+User: make the site "much cooler, much more sophisticated and modern...
+tech meets fashion but with warmth... largely on a light background."
+Full front-end restyle done while the pipeline sits paused (item 0c):
+
+- **Fonts**: Fraunces (serif italic, editorial headlines) + Plus Jakarta
+  Sans (clean grotesk body/UI) — the "tech meets fashion" pairing.
+- **Palette**: warm cream/paper background and ink-brown text replace
+  the old stark black-and-white theme; new "clay" terracotta brand
+  accent for highlights, prices, active states, CTAs. Occasional dark
+  "ink" sections (hero ticker, trending/newsletter banners, footer)
+  keep visual rhythm without abandoning "largely light".
+- **Shape**: pill buttons/badges/filters, larger card radius, warm soft
+  shadows, subtle grain texture on dark sections, dot-grid on the hero.
+- Applied across every public page (home, celebrity, look, item,
+  directories, category, trending, news, search, about, error states,
+  loading skeletons) plus nav/footer/UI primitives at the token level.
+
+Verified: typecheck clean, production build succeeds on all 49 routes.
+Visually confirmed via local dev server screenshots (chrome, hero, dark
+sections all render correctly); couldn't screenshot data-driven grids
+with real content — this sandbox can't reach Supabase directly — but
+the grid/card markup is structurally unchanged from what was already
+proven working, only colours/radii/fonts changed.
+
+### 0e. Top-of-funnel content collection was silently broken — FOUND & FIXED (2026-07-19)
+While looking for non-AI-dependent work, found `external_posts` had
+gone from dozens of new rows/day down to **zero** since 2026-07-17 —
+the actual news-scraping funnel, not just the paused AI stages. Root
+cause, two bugs stacked:
+1. `rss-ingest-every-2-hours`'s cron command referenced
+   `current_setting('app.settings.service_role_key')`, a custom
+   Postgres setting that was never actually set (or was wiped by the
+   2026-07-18 project restart) — every run failed with
+   `"unrecognized configuration parameter"`. Every other cron in this
+   project passes no Authorization header at all (all functions have
+   `verify_jwt: false`), so this header was both broken and unnecessary.
+2. Even with that fixed, the old `rss_ingest` function called a
+   `/enqueue` sub-route on a second function (`ingest`) that doesn't
+   exist in `ingest`'s actual code — guaranteed 400 on every item. And
+   `ingest` itself (never actually wired to any cron) used
+   `.upsert(..., {onConflict: 'celeb_id,link'})` against
+   `external_posts`, which has **no unique constraint matching that
+   target** — would have thrown Postgres error 42P10 on its first real
+   write. Neither of these two pre-existing functions had ever
+   successfully written a row; both were untracked in git.
+
+**Fixed**: rebuilt `rss_ingest` from scratch (now in
+`supabase/functions/rss_ingest/`, version 31) — self-contained, no
+sub-call, RSS+Atom parsing via `fast-xml-parser` (handles more feed
+shapes than the old regex parser), og:image fallback, the original's
+recency/relevance filtering kept, dedup via a plain existence check
+(matching the pattern already proven in `resolve_articles`) instead of
+a broken upsert target. Cron rescheduled with the header removed.
+**Verified live**: a 3-source test batch inserted 30 new, genuinely
+relevant, correctly-dated rows in under a minute.
+
+### 0f. Security hardening — zero AI cost — 2026-07-19
+Found while auditing: `public.debug_log` had **no RLS at all** (flagged
+`ERROR` by the Supabase security advisor) — any anon/authenticated
+caller could read or write it via the public REST API. It's a
+scratch table only ever written by edge functions using the
+service-role key (which bypasses RLS), so nothing legitimate needed
+public access. Enabled RLS with no policies (default-deny for public
+roles; service role unaffected) and truncated the accumulated test
+rows.
+
+Also revoked `anon` (fully unauthenticated) `EXECUTE` on the 12
+admin-only `SECURITY DEFINER` RPCs (`admin_delete_celebrity`,
+`admin_set_role`, `publish_celeb`, etc.) that the advisor flagged as
+anon-executable. Audited first: every one of them already checks
+`is_admin()`/`has_role(..., 'admin')` internally (confirmed via
+`pg_proc` source, including `admin_bulk_add_photos`, which uses
+`has_role()` directly rather than the `is_admin()` wrapper my grep
+initially missed) — **not an active vulnerability**, just defense in
+depth so an unauthenticated caller is rejected before reaching the
+function body. `authenticated` grants were left untouched and
+confirmed unaffected (the app's admin actions always call these
+through the session-aware server client, never the anon key).
+
+### 0g. Ready when the API keys land: Google Programmable Search setup
+Reference checklist for the search-first sourcing rebuild (item 0c) —
+none of this needs Gemini/Anthropic budget:
+1. In the same Google Cloud project as `GEMINI_API_KEY`: enable the
+   **Custom Search API** (console.cloud.google.com → APIs & Services →
+   Library → search "Custom Search API" → Enable).
+2. Create a search engine at programmablesearchengine.google.com →
+   "Add", set it to search the entire web, note the **Search engine
+   ID (cx)**.
+3. Get an API key for the Custom Search API (APIs & Services →
+   Credentials → Create Credentials → API key).
+4. Add both as Supabase secrets: `GOOGLE_CSE_KEY`, `GOOGLE_CSE_CX`.
+Free tier: 100 queries/day; $5/1,000 beyond that — no grounded-LLM
+guessing, real search results only.
+
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
 20/batch (480/day) had become the pipeline's choke point — 954 photos
