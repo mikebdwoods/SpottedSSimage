@@ -250,6 +250,15 @@ none of this needs Gemini/Anthropic budget:
 Free tier: 100 queries/day; $5/1,000 beyond that — no grounded-LLM
 guessing, real search results only.
 
+**Update 2026-07-19: the code side is now done (see item 0j) — this is
+purely a "get the keys, add the secrets" step away from being live.**
+Once added, also re-check `GEMINI_API_KEY`/`ANTHROPIC_API_KEY` have
+budget again (item 0b) for the vision-confirm step, then re-enable
+`source-products-every-10min` (schedule preserved in migration
+`pause_pipeline_for_quality_rebuild`'s comment) to go live. Optional at
+the same time: `GOOGLE_CSE_DAILY_CAP` / `VISION_DAILY_CAP` secrets to
+raise the default 90/150-per-day caps.
+
 ### 0i. Admin account + full login/password system wired — 2026-07-19
 `mike@bdwoods.co.uk` already existed as a confirmed user (created
 2025-10-28) but had no row in `user_roles`. Granted admin via a direct
@@ -298,6 +307,85 @@ build`, all 51 routes).
 the user directly in chat (not stored in this file) — first action
 after logging in should be changing it via `/account` or the
 forgot-password flow.**
+
+### 0j. Search-first sourcing rewrite built + budget-cap infrastructure — 2026-07-19 (code ready, pipeline still paused)
+Built the redesign agreed in item 0c ahead of the user providing the
+Google CSE keys, so it's ready to switch on the moment they land rather
+than starting from scratch then. Nothing here re-enables the pipeline —
+`source-products-every-10min` stays unscheduled, exactly as the user
+paused it.
+
+**`source_products` rewritten (deployed v5, same function slug the cron
+will call once re-enabled):**
+- **Find**: Google Programmable Search JSON API (`GOOGLE_CSE_KEY` +
+  `GOOGLE_CSE_CX`) instead of Gemini grounded search — a real search
+  index instead of an LLM guessing URLs, and roughly 1000x cheaper
+  ($5/1k vs grounded search's ~$35/1k, which is the likely reason the
+  Gemini spend cap was hit in ~80 minutes post-restart). One query for
+  the exact product, one query OR-scoped to the ten allowlisted
+  high-street retailers for cheaper alternatives — two Google queries
+  per item, budget-capped (see below).
+- **Verify**: same two-stage direct-fetch-then-Jina-proxy check as
+  before, upgraded to parse JSON-LD `Product` structured data before
+  falling back to og: tags (far more reliable — og:title/og:image is
+  what produced junk like "Mango United Kingdom - 2026 Sale" last
+  time), plus a much wider generic-title blocklist that explicitly
+  rejects bare retailer names, category-page titles ("Men's Coats &
+  Jackets"), and the "URL Source:" Jina artifact bug found earlier.
+- **Visually confirm — the actual fix for the bucket-hat failure**: a
+  single cheap vision call (`gemini-2.5-flash` or Claude, no search
+  grounding) shown the celebrity photo + the item's AI description
+  alongside the candidate's product image, asked to answer strictly
+  YES/NO on whether they plausibly match. A candidate is only ever
+  attached to `item_matches` on a YES. No vision provider configured,
+  budget exhausted, or an ambiguous/failed call all fail *closed* — no
+  attach, not "attach anyway". This is the check that was completely
+  absent before.
+- Without `GOOGLE_CSE_KEY`/`GOOGLE_CSE_CX` configured, the function is a
+  verified-live safe no-op (`{"skipped":true,"reason":"...see item
+  0g"}`, HTTP 200, no queue claimed, nothing spent) — confirmed via a
+  direct `net.http_post` call, never falls back to the old
+  grounded-guessing behaviour.
+- Fixed a claiming bug while rewriting: the old version marked the
+  whole batch `sourcing_attempted_at` upfront, so if a budget/rate
+  limit cut a batch short, untouched items would be marked "attempted"
+  forever and never picked up again. Now an item is only claimed the
+  moment real spend starts on it.
+
+**New: hard daily budget caps (`ai_budget_usage` table +
+`try_consume_ai_budget()`, migration
+`ai_budget_caps_and_match_type_guardrail`)** — every metered call
+(Google Search queries, vision checks) atomically checks-and-increments
+a per-provider daily counter first and is skipped entirely if the cap's
+already hit, failing closed on any error talking to the table rather
+than spending anyway. This is the circuit breaker that was completely
+missing during the Gemini/Claude budget incident (item 0b) — a stuck
+cron or a burst of new items can no longer silently run up a bill
+unnoticed. Defaults: 90 Google CSE calls/day (free tier is 100/day,
+leaves headroom), 150 vision calls/day; both overridable via
+`GOOGLE_CSE_DAILY_CAP` / `VISION_DAILY_CAP` secrets. Verified live with
+a temporary cap of 2: first two calls succeeded, third correctly
+rejected without over-incrementing.
+
+**New DB guardrail**: `item_matches.match_type` now has a `CHECK`
+constraint limiting it to `('exact', 'dupe', 'same_brand', 'manual')`.
+The purge at pause time (item 0c) deleted every `similar` and
+`celebrity_style_guess` match — the old category+colour-only matcher's
+output, and the direct cause of the WINONA-cap-to-green-bucket-hat
+result — but that was a one-time cleanup, not a standing rule. The old
+`match_products`/`process_unmatched_items_batch` pathway is dormant
+(not scheduled) and being superseded by this rewrite rather than fixed,
+but this constraint means those junk match types can never be
+reinserted even if it's ever accidentally rescheduled first.
+
+**Also added**: `cleanup-debug-log-weekly` cron (Sundays 04:30 UTC,
+`public.cleanup_debug_log()`) — deletes `debug_log` rows older than 14
+days. Ops hygiene item 7; zero AI cost, safe regardless of pause state.
+
+**Not built this round** (explicitly scoped out, still on the roadmap):
+Google Lens/SerpAPI reverse-image search for logo-less items (item 0c's
+"optional" step 2) and retailer sitemap bulk-ingestion. Both remain
+valid follow-ups once the core search+verify+vision loop is proven.
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
