@@ -102,12 +102,58 @@ one provider has budget again. `resolve_articles` and `match_products`
 are unaffected (no AI calls) and continue working normally against
 existing data.
 
-**Owner action needed — pick one (either unblocks everything):**
-1. Raise/remove the Gemini monthly spend cap: https://ai.studio/spend
-2. Add credits in the Anthropic Console: https://console.anthropic.com/settings/billing
+**Superseded by the 2026-07-19 pause below** — the user has decided not
+to add budget until the matching system is redesigned to be worth
+feeding.
 
-No code or infra fix applies here — this is purely an account-billing
-gate on both providers simultaneously.
+### 0c. ⏸️ PIPELINE PAUSED for quality rebuild — user directive 2026-07-19 morning
+User reviewed live results and found matching quality unacceptable
+(e.g. Olivia Rodrigo's navy "WINONA" baseball cap — perfectly described
+by the AI vision pass — matched to a *green bucket hat*; her cream wool
+coat matched to an M&S category page titled "Men's Coats & Jackets").
+Meanwhile a single manual Google search of the AI's own description
+finds the exact product (IDEA Winona Cap at END., €45) instantly.
+Directive: pause all AI calls and new-photo creation; redesign the
+matching layer before any more budget is spent.
+
+**Paused via migration `pause_pipeline_for_quality_rebuild`** (schedules
+preserved in the migration comment for exact restoration):
+`resolve-articles-every-5min`, `analyze-photos-every-10min`,
+`match-products-every-15min`, `source-products-every-10min`,
+`ingest-queue-every-30min`, `process-ingest-queue`. Still running:
+`rss-ingest-every-2-hours` (free link collection, no photos/AI) and
+`refresh-observed-brand-affinity-6h` (SQL-only).
+
+**Garbage purge done at pause time:** catalog audit found ~half of the
+66 products were junk — 12 titled literally "ASOS" (bot-walled og:title
+= site name), 10 titled "URL Source: https://..." (Jina artifact), site
+homepages/category pages sold as products ("Mango United Kingdom - 2026
+Sale", "Bowls | M&S", "Men's Coats & Jackets", Versace "Designer
+Clothing & Luxury Accessories" £6,241), and 4 products whose title and
+URL were different items entirely. Deleted 32 junk products, their 148
+matches, and all 1,512 generic `similar`/`celebrity_style_guess`
+matches (the category+colour matcher output — structurally junk against
+a small catalog and the direct source of the green-bucket-hat result).
+Only verified `exact`/`dupe` matches on sane products remain; item
+pages without them show the honest "No matches yet" state.
+
+**Redesign direction (agreed rationale, build pending user's API keys):
+search-first retrieval + visual verification, no grounded-search LLM.**
+Diagnosis: vision tagging works (it read "WINONA" correctly); the
+failure is retrieval (Gemini grounded search guesses URLs at ~$35/1k
+queries — likely what ate the spend cap) and the absence of any visual
+check before a match goes live. Plan: (1) Google Programmable Search
+JSON API ($5/1k queries, 100/day free) queried with the AI's own
+description tokens; (2) optional Google Lens reverse-image search via
+SerpAPI (~1.5p/query) for logo-less items; (3) a cheap vision yes/no
+comparing item photo vs candidate product image before any match is
+attached; (4) hard daily budget caps in a table every AI-calling
+function checks; (5) fix title extraction (JSON-LD product name before
+og:title; reject site-name/category titles); (6) longer-term: retailer
+sitemap ingestion + pgvector image embeddings for a big, free,
+visually-searchable alternatives catalog. Staged rollout: test on the
+known-failing looks first (pennies), then one capped day (~£2-3), then
+drain the backlog.
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
