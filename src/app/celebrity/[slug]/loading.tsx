@@ -2,7 +2,7 @@ export default function Loading() {
   return (
     <div className="min-h-screen animate-pulse">
       {/* Dark hero skeleton */}
-      <div className="bg-black py-14 px-4">
+      <div className="bg-primary py-14 px-4">
         <div className="mx-auto max-w-4xl flex flex-col sm:flex-row gap-8 items-center sm:items-start">
           <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-gray-700 shrink-0" />
           <div className="flex-1 text-center sm:text-left pt-2">

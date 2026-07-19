@@ -119,9 +119,9 @@ function renderPage(
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-gray-50 border-b py-10 px-4">
+      <div className="bg-secondary/40 border-b border-border py-10 px-4">
         <div className="mx-auto max-w-7xl">
-          <h1 className="text-3xl font-black tracking-tight mb-1">
+          <h1 className="font-serif italic text-3xl sm:text-4xl tracking-tight mb-1">
             {activeCeleb ? `${activeCeleb.name}'s Looks` : "Latest Looks"}
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -131,14 +131,14 @@ function renderPage(
       </div>
 
       {/* Filters */}
-      <div className="border-b bg-white sticky top-16 z-20">
+      <div className="border-b border-border bg-background/95 backdrop-blur sticky top-16 z-20">
         <div className="mx-auto max-w-7xl px-4">
           {/* Celebrity filter */}
-          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide border-b">
+          <div className="flex gap-1 overflow-x-auto py-2 scrollbar-hide border-b border-border">
             <Link
               href={buildHref({ cat: categoryFilter })}
               className={`shrink-0 text-xs font-semibold border rounded-full px-3 py-1.5 transition-colors ${
-                !celebSlug ? "bg-black text-white border-black" : "hover:bg-gray-50"
+                !celebSlug ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"
               }`}
             >
               All
@@ -149,8 +149,8 @@ function renderPage(
                 href={buildHref({ celeb: celeb.slug, cat: categoryFilter })}
                 className={`shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 transition-colors whitespace-nowrap ${
                   celebSlug === celeb.slug
-                    ? "bg-black text-white border-black"
-                    : "hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-secondary"
                 }`}
               >
                 {celeb.name}
@@ -162,7 +162,7 @@ function renderPage(
             <Link
               href={buildHref({ celeb: celebSlug })}
               className={`shrink-0 text-xs font-semibold border rounded-full px-3 py-1.5 transition-colors ${
-                !categoryFilter ? "bg-black text-white border-black" : "hover:bg-gray-50"
+                !categoryFilter ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-secondary"
               }`}
             >
               All items
@@ -173,8 +173,8 @@ function renderPage(
                 href={buildHref({ celeb: celebSlug, cat: slug })}
                 className={`shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 transition-colors whitespace-nowrap ${
                   categoryFilter === slug
-                    ? "bg-black text-white border-black"
-                    : "hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-secondary"
                 }`}
               >
                 {label}
@@ -196,7 +196,7 @@ function renderPage(
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {photos.map((photo) => {
                 const celeb = photo.celebrities as { name: string; slug: string } | null;
                 if (!celeb) return null;
@@ -206,7 +206,7 @@ function renderPage(
                     href={`/celebrity/${celeb.slug}/photo/${photo.id}`}
                     className="group"
                   >
-                    <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
+                    <div className="aspect-[3/4] relative overflow-hidden rounded-2xl bg-secondary shadow-warm">
                       {photo.image_url ? (
                         <Image
                           src={photo.image_url}
@@ -216,19 +216,19 @@ function renderPage(
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                           No image
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                       <div className="absolute bottom-0 left-0 right-0 p-2.5 translate-y-1 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <p className="text-white text-xs font-semibold leading-tight">
+                        <p className="text-primary-foreground text-xs font-semibold leading-tight">
                           {celeb.name}
                         </p>
-                        <p className="text-white/70 text-xs">Shop the look →</p>
+                        <p className="text-primary-foreground/70 text-xs">Shop the look →</p>
                       </div>
                     </div>
-                    <p className="text-xs font-medium mt-1.5 truncate text-muted-foreground group-hover:text-foreground transition-colors">
+                    <p className="text-xs font-medium mt-1.5 truncate text-muted-foreground group-hover:text-clay transition-colors">
                       {celeb.name}
                     </p>
                   </Link>
@@ -243,7 +243,7 @@ function renderPage(
               {currentPage > 1 && (
                 <Link
                   href={buildHref({ celeb: celebSlug, cat: categoryFilter, page: currentPage - 1 })}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-full px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   ← Prev
                 </Link>
@@ -259,8 +259,8 @@ function renderPage(
                     <Link
                       key={p}
                       href={buildHref({ celeb: celebSlug, cat: categoryFilter, page: p })}
-                      className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                        p === currentPage ? "bg-black text-white" : "border hover:bg-gray-50"
+                      className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors ${
+                        p === currentPage ? "bg-primary text-primary-foreground" : "border border-border hover:bg-secondary"
                       }`}
                     >
                       {p}
@@ -271,7 +271,7 @@ function renderPage(
               {currentPage < totalPages && (
                 <Link
                   href={buildHref({ celeb: celebSlug, cat: categoryFilter, page: currentPage + 1 })}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-full px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   Next →
                 </Link>

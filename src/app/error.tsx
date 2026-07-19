@@ -14,8 +14,8 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4">
-      <p className="text-[80px] font-black leading-none text-gray-100 select-none mb-2">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4 bg-dot-grid">
+      <p className="font-serif italic text-[70px] leading-none text-clay/25 select-none mb-2">
         Oops
       </p>
       <h1 className="text-xl font-bold mb-3 -mt-2">Something went wrong</h1>
@@ -25,13 +25,13 @@ export default function Error({
       <div className="flex gap-3">
         <button
           onClick={reset}
-          className="bg-black text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 transition-colors"
+          className="bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-primary/88 transition-colors"
         >
           Try again
         </button>
         <a
           href="/"
-          className="border px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+          className="border border-border px-5 py-2.5 rounded-full text-sm font-semibold hover:bg-secondary transition-colors"
         >
           Go home
         </a>

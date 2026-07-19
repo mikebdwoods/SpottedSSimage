@@ -64,22 +64,15 @@ export default async function TrendingPage() {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-black text-white py-12 px-4 relative overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
+      <div className="relative bg-primary text-primary-foreground texture-grain py-12 px-4 overflow-hidden">
+        <div className="pointer-events-none absolute -top-16 right-10 h-56 w-56 rounded-full bg-clay/15 blur-3xl" />
         <div className="relative mx-auto max-w-7xl">
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-primary-foreground/50 uppercase tracking-widest mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-clay animate-pulse" />
             Live
           </div>
-          <h1 className="text-4xl font-black tracking-tight mb-2">Trending Now</h1>
-          <p className="text-gray-400 text-sm">
+          <h1 className="font-serif italic text-4xl sm:text-5xl tracking-tight mb-2">Trending Now</h1>
+          <p className="text-primary-foreground/60 text-sm">
             The most-spotted celebrity looks this week
           </p>
         </div>
@@ -87,7 +80,7 @@ export default async function TrendingPage() {
 
       {/* Trending celebrities */}
       {trendingCelebs.length > 0 && (
-        <section className="py-10 px-4 border-b">
+        <section className="py-10 px-4 border-b border-border">
           <div className="mx-auto max-w-7xl">
             <h2 className="text-lg font-bold mb-5">
               Most active celebrities
@@ -100,7 +93,7 @@ export default async function TrendingPage() {
                   className="group flex flex-col items-center text-center"
                 >
                   <div className="relative">
-                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-gray-200 ring-2 ring-transparent group-hover:ring-black transition-all duration-200">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-secondary ring-2 ring-transparent group-hover:ring-clay transition-all duration-200 shadow-warm">
                       {celeb.image_url ? (
                         <Image
                           src={celeb.image_url}
@@ -110,12 +103,12 @@ export default async function TrendingPage() {
                           sizes="80px"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-400">
+                        <div className="w-full h-full flex items-center justify-center text-xl font-serif italic text-muted-foreground">
                           {celeb.name.charAt(0)}
                         </div>
                       )}
                     </div>
-                    <span className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center">
+                    <span className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-clay text-clay-foreground text-xs font-bold flex items-center justify-center">
                       {i + 1}
                     </span>
                   </div>
@@ -136,7 +129,7 @@ export default async function TrendingPage() {
 
       {/* Most shopped looks */}
       {mostShopped && mostShopped.length > 0 && (
-        <section className="py-10 px-4 border-b">
+        <section className="py-10 px-4 border-b border-border">
           <div className="mx-auto max-w-7xl">
             <div className="flex items-baseline justify-between mb-5">
               <h2 className="text-lg font-bold">Most shoppable looks</h2>
@@ -157,7 +150,7 @@ export default async function TrendingPage() {
                     href={`/celebrity/${celeb.slug}/photo/${photo.id}`}
                     className="group"
                   >
-                    <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
+                    <div className="aspect-[3/4] relative overflow-hidden rounded-2xl bg-secondary shadow-warm">
                       {photo.image_url ? (
                         <Image
                           src={photo.image_url}
@@ -167,12 +160,12 @@ export default async function TrendingPage() {
                           sizes="(max-width: 640px) 50vw, 15vw"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                           No image
                         </div>
                       )}
                       {itemCount > 0 && (
-                        <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                        <div className="absolute bottom-2 right-2 bg-primary/85 text-primary-foreground text-xs font-semibold px-2 py-0.5 rounded-full">
                           {itemCount} item{itemCount === 1 ? "" : "s"}
                         </div>
                       )}
@@ -204,7 +197,7 @@ export default async function TrendingPage() {
                   <Link
                     key={photo.id}
                     href={`/celebrity/${celeb.slug}/photo/${photo.id}`}
-                    className={`group relative overflow-hidden rounded-2xl bg-gray-100 ${
+                    className={`group relative overflow-hidden rounded-2xl bg-secondary shadow-warm ${
                       i === 0 ? "col-span-2 row-span-2" : ""
                     }`}
                   >
@@ -227,18 +220,18 @@ export default async function TrendingPage() {
                           priority={i === 0}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           No image
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-transparent to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="text-white text-sm font-semibold">{celeb.name}</p>
-                        <p className="text-white/60 text-xs">Shop the look →</p>
+                        <p className="text-primary-foreground text-sm font-semibold">{celeb.name}</p>
+                        <p className="text-primary-foreground/60 text-xs">Shop the look →</p>
                       </div>
                       {i === 0 && (
                         <div className="absolute top-3 left-3">
-                          <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                          <span className="bg-clay text-clay-foreground text-xs font-bold px-2.5 py-1 rounded-full">
                             Hot 🔥
                           </span>
                         </div>

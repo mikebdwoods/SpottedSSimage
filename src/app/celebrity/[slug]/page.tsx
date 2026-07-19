@@ -120,15 +120,8 @@ export default async function CelebrityPage({
   return (
     <div className="min-h-screen">
       {/* Celebrity Header */}
-      <div className="relative bg-black text-white overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.03]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-            backgroundSize: "32px 32px",
-          }}
-        />
+      <div className="relative bg-primary text-primary-foreground texture-grain overflow-hidden">
+        <div className="pointer-events-none absolute -top-20 right-0 h-72 w-72 rounded-full bg-clay/15 blur-3xl" />
         <div className="relative mx-auto max-w-4xl px-4 py-14 flex flex-col sm:flex-row gap-8 items-center sm:items-start">
           <div className="relative w-28 h-28 sm:w-36 sm:h-36 shrink-0">
             {celeb.photo_url ? (
@@ -136,34 +129,34 @@ export default async function CelebrityPage({
                 src={celeb.photo_url}
                 alt={celeb.name}
                 fill
-                className="object-cover rounded-full ring-4 ring-white/10"
+                className="object-cover rounded-full ring-4 ring-primary-foreground/10"
                 sizes="144px"
               />
             ) : (
-              <div className="w-full h-full rounded-full bg-gray-700 ring-4 ring-white/10 flex items-center justify-center text-4xl font-bold text-gray-400">
+              <div className="w-full h-full rounded-full bg-primary-foreground/10 ring-4 ring-primary-foreground/10 flex items-center justify-center text-4xl font-serif italic text-primary-foreground/40">
                 {celeb.name.charAt(0)}
               </div>
             )}
           </div>
           <div className="text-center sm:text-left">
-            <p className="text-xs font-semibold tracking-[0.2em] text-gray-400 uppercase mb-2">
+            <p className="text-xs font-semibold tracking-[0.2em] text-primary-foreground/50 uppercase mb-2">
               Celebrity
             </p>
-            <h1 className="text-4xl font-black tracking-tight mb-3">{celeb.name}</h1>
+            <h1 className="font-serif italic text-4xl sm:text-5xl tracking-tight mb-3">{celeb.name}</h1>
             {celeb.bio && (
-              <p className="text-gray-300 max-w-lg text-sm leading-relaxed mb-4">
+              <p className="text-primary-foreground/70 max-w-lg text-sm leading-relaxed mb-5">
                 {celeb.bio}
               </p>
             )}
             <div className="flex items-center gap-4 justify-center sm:justify-start">
-              <span className="text-sm text-gray-400">
-                <span className="font-semibold text-white">{lookCount}</span>{" "}
+              <span className="text-sm text-primary-foreground/60">
+                <span className="font-semibold text-primary-foreground">{lookCount}</span>{" "}
                 look{lookCount === 1 ? "" : "s"}
               </span>
               {lookCount > 0 && (
                 <a
                   href="#looks"
-                  className="text-xs font-semibold bg-white text-black px-4 py-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                  className="text-xs font-semibold bg-clay text-clay-foreground px-4 py-1.5 rounded-full hover:bg-clay/90 transition-colors"
                 >
                   Browse looks
                 </a>
@@ -174,9 +167,9 @@ export default async function CelebrityPage({
       </div>
 
       {/* Photos Grid */}
-      <section id="looks" className="py-12 px-4">
+      <section id="looks" className="py-14 px-4">
         <div className="mx-auto max-w-7xl">
-          <h2 className="text-xl font-semibold mb-6">Looks</h2>
+          <h2 className="font-serif italic text-2xl sm:text-3xl tracking-tight mb-6">Looks</h2>
           {!celebPhotos || celebPhotos.length === 0 ? (
             <p className="text-muted-foreground">No looks posted yet — check back soon.</p>
           ) : (
@@ -187,7 +180,7 @@ export default async function CelebrityPage({
                   href={`/celebrity/${slug}/photo/${photo.id}`}
                   className="group"
                 >
-                  <div className="aspect-[3/4] relative overflow-hidden rounded-lg bg-gray-200">
+                  <div className="aspect-[3/4] relative overflow-hidden rounded-2xl bg-secondary shadow-warm">
                     {photo.image_url ? (
                       <Image
                         src={photo.image_url}
@@ -197,7 +190,7 @@ export default async function CelebrityPage({
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
                         No image
                       </div>
                     )}
@@ -211,9 +204,9 @@ export default async function CelebrityPage({
 
       {/* Merch */}
       {celebMerch && celebMerch.length > 0 && (
-        <section className="py-12 px-4 bg-gray-50">
+        <section className="py-14 px-4 bg-secondary/40 border-y border-border">
           <div className="mx-auto max-w-7xl">
-            <h2 className="text-xl font-semibold mb-6">
+            <h2 className="font-serif italic text-2xl sm:text-3xl tracking-tight mb-6">
               {celeb.name} Merch
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
@@ -225,7 +218,7 @@ export default async function CelebrityPage({
                   rel="noopener noreferrer"
                   className="group"
                 >
-                  <div className="aspect-square relative overflow-hidden rounded-lg bg-gray-100 mb-3">
+                  <div className="aspect-square relative overflow-hidden rounded-2xl bg-card border border-border shadow-warm mb-3">
                     {item.image_url ? (
                       <Image
                         src={item.image_url}
@@ -235,7 +228,7 @@ export default async function CelebrityPage({
                         sizes="(max-width: 640px) 50vw, 25vw"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         No image
                       </div>
                     )}
@@ -255,10 +248,10 @@ export default async function CelebrityPage({
 
       {/* In the news */}
       {newsPosts && newsPosts.length > 0 && (
-        <section className="py-12 px-4 border-t">
+        <section className="py-14 px-4 border-t border-border">
           <div className="mx-auto max-w-7xl">
             <div className="flex items-baseline justify-between mb-6">
-              <h2 className="text-xl font-semibold">In the news</h2>
+              <h2 className="font-serif italic text-2xl sm:text-3xl tracking-tight">In the news</h2>
               <p className="text-xs text-muted-foreground">
                 Latest {celeb.name} coverage from around the web
               </p>
@@ -272,7 +265,7 @@ export default async function CelebrityPage({
                   rel="noopener noreferrer"
                   className="group"
                 >
-                  <div className="aspect-square relative overflow-hidden rounded-xl bg-gray-100 mb-2">
+                  <div className="aspect-square relative overflow-hidden rounded-xl bg-secondary mb-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={post.image_url ?? ""}
@@ -298,7 +291,7 @@ export default async function CelebrityPage({
 
       {/* Related celebrities */}
       {relatedCelebs && relatedCelebs.length > 0 && (
-        <section className="py-12 px-4 border-t">
+        <section className="py-14 px-4 border-t border-border">
           <div className="mx-auto max-w-7xl">
             <h2 className="text-lg font-bold mb-5">More celebrities</h2>
             <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
@@ -308,7 +301,7 @@ export default async function CelebrityPage({
                   href={`/celebrity/${rc.slug}`}
                   className="group flex flex-col items-center text-center"
                 >
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-gray-200 mb-1.5 ring-2 ring-transparent group-hover:ring-black transition-all duration-200 relative">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-secondary mb-1.5 ring-2 ring-transparent group-hover:ring-clay transition-all duration-200 relative">
                     {rc.photo_url ? (
                       <Image
                         src={rc.photo_url}
@@ -318,7 +311,7 @@ export default async function CelebrityPage({
                         sizes="64px"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-base font-bold text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-base font-bold text-muted-foreground">
                         {rc.name.charAt(0)}
                       </div>
                     )}

@@ -42,29 +42,22 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen">
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section className="relative bg-black text-white overflow-hidden">
-        {/* Subtle grid background */}
-        <div
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-            backgroundSize: "40px 40px",
-          }}
-        />
-        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:py-36 flex flex-col items-center text-center">
-          <span className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.3em] text-gray-400 uppercase mb-6 border border-gray-700 rounded-full px-4 py-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+      <section className="relative overflow-hidden bg-dot-grid">
+        <div className="pointer-events-none absolute -top-24 -right-24 h-96 w-96 rounded-full bg-clay/10 blur-3xl" />
+        <div className="pointer-events-none absolute top-40 -left-32 h-72 w-72 rounded-full bg-clay/[0.07] blur-3xl" />
+        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:py-28 flex flex-col items-center text-center">
+          <span className="inline-flex items-center gap-2 text-xs font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-7 border border-border rounded-full px-4 py-1.5 bg-card/80">
+            <span className="w-1.5 h-1.5 rounded-full bg-clay animate-pulse" />
             UK Celebrity Fashion
           </span>
-          <h1 className="text-7xl sm:text-9xl font-black tracking-tighter mb-6 leading-none">
+          <h1 className="font-serif italic text-6xl sm:text-8xl tracking-tight mb-6 leading-[0.95] text-foreground">
             Spotted
           </h1>
-          <p className="text-base sm:text-lg text-gray-300 max-w-md leading-relaxed mb-10">
+          <p className="text-base sm:text-lg text-muted-foreground max-w-md leading-relaxed mb-10">
             Discover what your favourite celebrities are wearing&nbsp;—
             and shop the look for less.
           </p>
-          <div className="w-full max-w-sm mx-auto mb-6">
+          <div className="w-full max-w-sm mx-auto mb-7">
             <CelebritySearch
               celebrities={topCelebs.map((c) => ({
                 id: c.id,
@@ -80,7 +73,7 @@ export default async function HomePage() {
                 {topCelebs.slice(0, 6).map((celeb) => (
                   <div
                     key={celeb.id}
-                    className="relative w-9 h-9 rounded-full border-2 border-black overflow-hidden bg-gray-700"
+                    className="relative w-9 h-9 rounded-full border-2 border-background overflow-hidden bg-secondary"
                   >
                     {celeb.photo_url && (
                       <Image
@@ -94,7 +87,7 @@ export default async function HomePage() {
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 {topCelebs.length} celebrities tracked
               </p>
             </div>
@@ -104,15 +97,15 @@ export default async function HomePage() {
 
       {/* ── Ticker strip ─────────────────────────────────────── */}
       {topCelebs.length > 0 && (
-        <div className="bg-black border-t border-gray-800 py-2.5 overflow-hidden">
-          <div className="flex animate-[marquee_30s_linear_infinite] whitespace-nowrap">
+        <div className="relative bg-primary texture-grain py-2.5 overflow-hidden">
+          <div className="flex animate-marquee whitespace-nowrap">
             {[...topCelebs, ...topCelebs].map((celeb, i) => (
               <Link
                 key={i}
                 href={`/celebrity/${celeb.slug}`}
-                className="inline-flex items-center gap-2 mx-6 text-xs text-gray-400 hover:text-white transition-colors shrink-0"
+                className="inline-flex items-center gap-2 mx-6 text-xs text-primary-foreground/60 hover:text-primary-foreground transition-colors shrink-0"
               >
-                <span className="w-1 h-1 rounded-full bg-gray-600" />
+                <span className="w-1 h-1 rounded-full bg-clay" />
                 {celeb.name}
               </Link>
             ))}
@@ -121,7 +114,7 @@ export default async function HomePage() {
       )}
 
       {/* ── Category Shortcuts ───────────────────────────────── */}
-      <section className="py-6 px-4 border-b bg-white">
+      <section className="py-6 px-4 border-b border-border bg-background">
         <div className="mx-auto max-w-7xl">
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             {[
@@ -139,7 +132,7 @@ export default async function HomePage() {
               <Link
                 key={slug}
                 href={`/category/${slug}`}
-                className="shrink-0 text-xs font-semibold border rounded-full px-3.5 py-1.5 hover:bg-gray-50 hover:border-gray-300 transition-colors whitespace-nowrap"
+                className="shrink-0 text-xs font-semibold border border-border rounded-full px-3.5 py-1.5 hover:border-clay hover:text-clay transition-colors whitespace-nowrap"
               >
                 {label}
               </Link>
@@ -150,30 +143,30 @@ export default async function HomePage() {
 
       {/* ── Latest Looks ─────────────────────────────────────── */}
       {latestLooks.length > 0 && (
-        <section className="py-16 px-4">
+        <section className="py-16 sm:py-20 px-4">
           <div className="mx-auto max-w-7xl">
             <div className="flex items-baseline justify-between mb-8">
               <div>
-                <h2 className="text-2xl font-black tracking-tight">Latest Looks</h2>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h2 className="font-serif italic text-3xl sm:text-4xl tracking-tight">Latest Looks</h2>
+                <p className="text-sm text-muted-foreground mt-1.5">
                   Just spotted — click to shop each item
                 </p>
               </div>
               <Link
                 href="/looks"
-                className="text-sm font-medium hover:underline hidden sm:block"
+                className="text-sm font-semibold text-clay hover:underline hidden sm:block shrink-0"
               >
                 View all looks →
               </Link>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
               {latestLooks.map((photo, i) => {
                 if (!photo.celeb) return null;
                 return (
                   <Link
                     key={photo.id}
                     href={`/celebrity/${photo.celeb.slug}/photo/${photo.id}`}
-                    className={`group relative overflow-hidden rounded-2xl bg-gray-100 ${
+                    className={`group relative overflow-hidden rounded-2xl bg-secondary shadow-warm ${
                       i === 0 ? "col-span-2 row-span-2" : ""
                     }`}
                   >
@@ -196,21 +189,21 @@ export default async function HomePage() {
                           priority={i === 0}
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           No image
                         </div>
                       )}
                       {/* Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/75 via-primary/0 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-3">
-                        <p className="text-white text-sm font-semibold leading-tight">
+                        <p className="text-primary-foreground text-sm font-semibold leading-tight">
                           {photo.celeb.name}
                         </p>
-                        <p className="text-white/60 text-xs mt-0.5">Shop the look →</p>
+                        <p className="text-primary-foreground/60 text-xs mt-0.5">Shop the look →</p>
                       </div>
                       {i === 0 && (
                         <div className="absolute top-3 left-3">
-                          <span className="bg-white text-black text-xs font-bold px-2.5 py-1 rounded-full">
+                          <span className="bg-clay text-clay-foreground text-xs font-bold px-2.5 py-1 rounded-full">
                             New
                           </span>
                         </div>
@@ -224,7 +217,7 @@ export default async function HomePage() {
           <div className="flex justify-center mt-8 sm:hidden">
             <Link
               href="/looks"
-              className="text-sm font-medium border rounded-lg px-4 py-2 hover:bg-gray-50 transition-colors"
+              className="text-sm font-semibold border border-border rounded-full px-5 py-2.5 hover:border-clay hover:text-clay transition-colors"
             >
               View all looks →
             </Link>
@@ -234,11 +227,11 @@ export default async function HomePage() {
 
       {/* ── Celebrity Grid ───────────────────────────────────── */}
       {topCelebs.length > 0 && (
-        <section className="py-16 px-4 bg-gray-50">
+        <section className="py-16 sm:py-20 px-4 bg-secondary/40 border-y border-border">
           <div className="mx-auto max-w-7xl">
             <div className="flex items-baseline justify-between mb-8">
-              <h2 className="text-2xl font-black tracking-tight">Browse by Celebrity</h2>
-              <Link href="/celebrities" className="text-sm font-medium hover:underline">
+              <h2 className="font-serif italic text-3xl sm:text-4xl tracking-tight">Browse by Celebrity</h2>
+              <Link href="/celebrities" className="text-sm font-semibold text-clay hover:underline shrink-0">
                 See all {topCelebs.length} →
               </Link>
             </div>
@@ -249,7 +242,7 @@ export default async function HomePage() {
                   href={`/celebrity/${celeb.slug}`}
                   className="group flex flex-col items-center text-center"
                 >
-                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-gray-200 mb-2 ring-2 ring-transparent group-hover:ring-black transition-all duration-200">
+                  <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden bg-secondary mb-2 ring-2 ring-transparent group-hover:ring-clay transition-all duration-200 shadow-warm">
                     {celeb.photo_url ? (
                       <Image
                         src={celeb.photo_url}
@@ -259,7 +252,7 @@ export default async function HomePage() {
                         sizes="80px"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-xl font-bold text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-xl font-bold text-muted-foreground">
                         {celeb.name.charAt(0)}
                       </div>
                     )}
@@ -275,22 +268,22 @@ export default async function HomePage() {
       )}
 
       {/* ── Trending banner ──────────────────────────────────── */}
-      <section className="py-8 px-4 bg-black text-white">
-        <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
+      <section className="relative py-8 px-4 bg-primary text-primary-foreground texture-grain overflow-hidden">
+        <div className="relative mx-auto max-w-7xl flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-clay animate-pulse" />
             <div>
               <p className="font-bold text-sm sm:text-base">
                 See what&apos;s trending right now
               </p>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-primary-foreground/50">
                 The hottest celebrity looks this week
               </p>
             </div>
           </div>
           <Link
             href="/trending"
-            className="shrink-0 bg-white text-black text-xs sm:text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+            className="shrink-0 bg-clay text-clay-foreground text-xs sm:text-sm font-semibold px-4 py-2 rounded-full hover:bg-clay/90 transition-colors"
           >
             View trending →
           </Link>
@@ -298,23 +291,23 @@ export default async function HomePage() {
       </section>
 
       {/* ── How it works ─────────────────────────────────────── */}
-      <section className="py-16 px-4">
+      <section className="py-16 sm:py-20 px-4">
         <div className="mx-auto max-w-3xl text-center">
-          <h2 className="text-2xl font-black tracking-tight mb-2">How Spotted works</h2>
-          <p className="text-muted-foreground text-sm mb-10">
+          <h2 className="font-serif italic text-3xl sm:text-4xl tracking-tight mb-2">How Spotted works</h2>
+          <p className="text-muted-foreground text-sm mb-12">
             From paparazzi pic to your basket in three steps.
           </p>
-          <div className="grid sm:grid-cols-3 gap-8">
+          <div className="grid sm:grid-cols-3 gap-10">
             {[
               { step: "1", title: "We spot the look", desc: "Our team tracks celebrity outfits across the UK and beyond." },
               { step: "2", title: "AI tags each item", desc: "Every piece is categorised by type, colour, and brand." },
               { step: "3", title: "You shop for less", desc: "Choose from budget, mid-range, or premium alternatives." },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center text-lg font-black mb-4">
+                <div className="w-12 h-12 rounded-full bg-clay-soft text-clay flex items-center justify-center text-lg font-serif italic mb-4">
                   {step}
                 </div>
-                <h3 className="font-bold mb-1">{title}</h3>
+                <h3 className="font-bold mb-1.5">{title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
               </div>
             ))}
@@ -324,9 +317,9 @@ export default async function HomePage() {
 
       {/* ── Merch ────────────────────────────────────────────── */}
       {merch && merch.length > 0 && (
-        <section className="py-16 px-4 bg-gray-50">
+        <section className="py-16 sm:py-20 px-4 bg-secondary/40 border-y border-border">
           <div className="mx-auto max-w-7xl">
-            <h2 className="text-2xl font-black tracking-tight mb-2">Official Merch</h2>
+            <h2 className="font-serif italic text-3xl sm:text-4xl tracking-tight mb-2">Official Merch</h2>
             <p className="text-sm text-muted-foreground mb-8">
               Direct from your favourite celebrities.
             </p>
@@ -341,7 +334,7 @@ export default async function HomePage() {
                     rel="noopener noreferrer"
                     className="group"
                   >
-                    <div className="aspect-square relative overflow-hidden rounded-2xl bg-gray-100 mb-3">
+                    <div className="aspect-square relative overflow-hidden rounded-2xl bg-card border border-border shadow-warm mb-3">
                       {item.image_url ? (
                         <Image
                           src={item.image_url}
@@ -351,7 +344,7 @@ export default async function HomePage() {
                           sizes="(max-width: 640px) 50vw, 25vw"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           No image
                         </div>
                       )}
@@ -370,20 +363,21 @@ export default async function HomePage() {
       )}
 
       {/* ── Newsletter ───────────────────────────────────────── */}
-      <section id="newsletter" className="py-20 px-4 bg-black text-white">
-        <div className="mx-auto max-w-md text-center">
-          <p className="text-xs font-semibold tracking-[0.3em] text-gray-500 uppercase mb-3">
+      <section id="newsletter" className="relative py-20 sm:py-24 px-4 bg-primary text-primary-foreground texture-grain overflow-hidden">
+        <div className="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 h-64 w-[36rem] rounded-full bg-clay/15 blur-3xl" />
+        <div className="relative mx-auto max-w-md text-center">
+          <p className="text-xs font-semibold tracking-[0.3em] text-primary-foreground/50 uppercase mb-3">
             Stay ahead
           </p>
-          <h2 className="text-4xl font-black tracking-tight mb-2 leading-none">
+          <h2 className="font-serif italic text-4xl sm:text-5xl tracking-tight mb-3 leading-none">
             Be the first to know
           </h2>
-          <p className="text-gray-400 mb-8 text-sm leading-relaxed">
+          <p className="text-primary-foreground/60 mb-8 text-sm leading-relaxed">
             New looks, shopping finds, and celebrity fashion drops — direct to
             your inbox.
           </p>
           <NewsletterForm />
-          <p className="text-xs text-gray-600 mt-4">
+          <p className="text-xs text-primary-foreground/40 mt-4">
             No spam. Unsubscribe any time.
           </p>
         </div>

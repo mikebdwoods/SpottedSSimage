@@ -85,7 +85,7 @@ export default async function CategoryPage({
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-gray-50 border-b py-10 px-4">
+      <div className="bg-secondary/40 border-b border-border py-10 px-4">
         <div className="mx-auto max-w-7xl">
           <nav className="text-xs text-muted-foreground mb-3">
             <Link href="/" className="hover:underline">Home</Link>
@@ -94,7 +94,7 @@ export default async function CategoryPage({
             {" / "}
             <span className="font-medium text-foreground">{meta.label}</span>
           </nav>
-          <h1 className="text-3xl font-black tracking-tight mb-1">
+          <h1 className="font-serif italic text-3xl sm:text-4xl tracking-tight mb-1">
             {meta.label}
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -104,7 +104,7 @@ export default async function CategoryPage({
       </div>
 
       {/* Category strip */}
-      <div className="border-b bg-white">
+      <div className="border-b border-border bg-background">
         <div className="mx-auto max-w-7xl px-4">
           <div className="flex gap-1 overflow-x-auto py-2.5 scrollbar-hide">
             {Object.entries(CATEGORY_META).map(([k, v]) => (
@@ -113,8 +113,8 @@ export default async function CategoryPage({
                 href={`/category/${k}`}
                 className={`shrink-0 text-xs font-medium border rounded-full px-3 py-1.5 transition-colors whitespace-nowrap ${
                   k === slug
-                    ? "bg-black text-white border-black"
-                    : "hover:bg-gray-50"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-secondary"
                 }`}
               >
                 {v.label}
@@ -138,7 +138,7 @@ export default async function CategoryPage({
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {items.map((item) => {
                 const photo = item.photos as unknown as {
                   id: string;
@@ -153,7 +153,7 @@ export default async function CategoryPage({
                     href={`/celebrity/${celeb.slug}/item/${item.id}`}
                     className="group"
                   >
-                    <div className="aspect-[3/4] relative overflow-hidden rounded-xl bg-gray-100">
+                    <div className="aspect-[3/4] relative overflow-hidden rounded-2xl bg-secondary shadow-warm">
                       {photo.image_url ? (
                         <Image
                           src={photo.image_url}
@@ -163,14 +163,14 @@ export default async function CategoryPage({
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
                           No image
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-primary/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="absolute bottom-0 left-0 right-0 p-2.5 translate-y-1 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <p className="text-white text-xs font-semibold">{celeb.name}</p>
-                        <p className="text-white/70 text-xs">Shop →</p>
+                        <p className="text-primary-foreground text-xs font-semibold">{celeb.name}</p>
+                        <p className="text-primary-foreground/70 text-xs">Shop →</p>
                       </div>
                     </div>
                     <div className="mt-1.5">
@@ -193,7 +193,7 @@ export default async function CategoryPage({
               {currentPage > 1 && (
                 <Link
                   href={`/category/${slug}?page=${currentPage - 1}`}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-full px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   ← Prev
                 </Link>
@@ -214,10 +214,10 @@ export default async function CategoryPage({
                     <Link
                       key={p}
                       href={`/category/${slug}?page=${p}`}
-                      className={`w-9 h-9 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                      className={`w-9 h-9 flex items-center justify-center rounded-full text-sm font-medium transition-colors ${
                         p === currentPage
-                          ? "bg-black text-white"
-                          : "border hover:bg-gray-50"
+                          ? "bg-primary text-primary-foreground"
+                          : "border border-border hover:bg-secondary"
                       }`}
                     >
                       {p}
@@ -228,7 +228,7 @@ export default async function CategoryPage({
               {currentPage < totalPages && (
                 <Link
                   href={`/category/${slug}?page=${currentPage + 1}`}
-                  className="border rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-full px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors"
                 >
                   Next →
                 </Link>
@@ -239,7 +239,7 @@ export default async function CategoryPage({
       </section>
 
       {/* Related categories */}
-      <section className="py-10 px-4 bg-gray-50 border-t">
+      <section className="py-10 px-4 bg-secondary/40 border-t border-border">
         <div className="mx-auto max-w-7xl">
           <h2 className="text-lg font-bold mb-4">Browse other categories</h2>
           <div className="flex flex-wrap gap-2">
@@ -247,7 +247,7 @@ export default async function CategoryPage({
               <Link
                 key={k}
                 href={`/category/${k}`}
-                className="border bg-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                className="border border-border bg-card rounded-full px-4 py-2 text-sm font-medium hover:border-clay hover:text-clay transition-colors"
               >
                 {v.label}
               </Link>

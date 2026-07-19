@@ -65,10 +65,10 @@ export default async function CelebritiesPage({
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-gray-50 border-b py-10 px-4">
+      <div className="bg-secondary/40 border-b border-border py-10 px-4">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-black tracking-tight mb-1">
+            <h1 className="font-serif italic text-3xl sm:text-4xl tracking-tight mb-1">
               {activeLetter ? `Celebrities — ${activeLetter}` : "All Celebrities"}
             </h1>
             <p className="text-muted-foreground text-sm">
@@ -84,11 +84,11 @@ export default async function CelebritiesPage({
               type="search"
               defaultValue={q ?? ""}
               placeholder="Search celebrities..."
-              className="flex-1 border rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black bg-white"
+              className="flex-1 border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-clay/30 focus:border-clay bg-card"
             />
             <button
               type="submit"
-              className="bg-black text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shrink-0"
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-semibold hover:bg-primary/88 transition-colors shrink-0"
             >
               Go
             </button>
@@ -98,13 +98,13 @@ export default async function CelebritiesPage({
 
       {/* A-Z filter */}
       {!q && (
-        <div className="border-b bg-white sticky top-16 z-20">
+        <div className="border-b border-border bg-background/95 backdrop-blur sticky top-16 z-20">
           <div className="mx-auto max-w-7xl px-4">
             <div className="flex gap-0.5 overflow-x-auto py-2 scrollbar-hide">
               <Link
                 href="/celebrities"
-                className={`shrink-0 w-8 h-8 flex items-center justify-center rounded text-xs font-semibold transition-colors ${
-                  !activeLetter ? "bg-black text-white" : "hover:bg-gray-100 text-muted-foreground"
+                className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                  !activeLetter ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"
                 }`}
               >
                 All
@@ -113,10 +113,10 @@ export default async function CelebritiesPage({
                 <Link
                   key={l}
                   href={`/celebrities?letter=${l}`}
-                  className={`shrink-0 w-8 h-8 flex items-center justify-center rounded text-xs font-semibold transition-colors ${
+                  className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-full text-xs font-semibold transition-colors ${
                     activeLetter === l
-                      ? "bg-black text-white"
-                      : "hover:bg-gray-100 text-muted-foreground"
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-secondary text-muted-foreground"
                   }`}
                 >
                   {l}
@@ -150,7 +150,7 @@ export default async function CelebritiesPage({
                   href={`/celebrity/${celeb.slug}`}
                   className="group flex flex-col items-center text-center"
                 >
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gray-200 mb-3 ring-2 ring-transparent group-hover:ring-black transition-all duration-200">
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-secondary mb-3 ring-2 ring-transparent group-hover:ring-clay transition-all duration-200 shadow-warm">
                     {celeb.image_url ? (
                       <Image
                         src={celeb.image_url}
@@ -160,7 +160,7 @@ export default async function CelebritiesPage({
                         sizes="96px"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-2xl font-serif italic text-muted-foreground">
                         {celeb.name.charAt(0)}
                       </div>
                     )}
