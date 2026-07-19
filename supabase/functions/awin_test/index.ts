@@ -92,6 +92,36 @@ Deno.serve(async (req) => {
       (globalThis as any).EdgeRuntime?.waitUntil(task);
       return json({ started: true });
     }
+    if (body?.claude_test === true) {
+      const key = Deno.env.get("ANTHROPIC_API_KEY");
+      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      if (!key) {
+        await supabase.from("debug_log").insert({ label: "claude_test", payload: { error: "no ANTHROPIC_API_KEY set" } });
+        return json({ error: "no ANTHROPIC_API_KEY set" }, 400);
+      }
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "x-api-key": key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 10,
+            messages: [{ role: "user", content: "hi" }],
+          }),
+        });
+        const text = await res.text();
+        await supabase.from("debug_log").insert({ label: "claude_test", payload: { status: res.status, body: text.slice(0, 1000) } });
+        return json({ status: res.status, body: text.slice(0, 1000) });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await supabase.from("debug_log").insert({ label: "claude_test", payload: { error: msg } });
+        return json({ error: msg }, 500);
+      }
+    }
     if (Array.isArray(body?.fetch_urls)) {
       const results = [];
       for (const url of body.fetch_urls.slice(0, 15)) {

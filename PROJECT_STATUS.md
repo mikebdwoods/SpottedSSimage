@@ -75,17 +75,39 @@ worked again — crons fired, pg_net delivered, edge functions booted and
 executed for the first time since **16:25 UTC** (the true stall start,
 much earlier than first thought).
 
-**Remaining blocker:** the months of grinding exhausted the instance's
-burst disk-IO budget. Edge functions now run but their database reads
-time out (resolve_articles 500s, analyze_photo "photo not found" after
-15s = its SELECT timing out); even the cron launcher struggles to
-record runs. Nothing more can be fixed from the client side.
-**Owner action needed: Supabase dashboard → Settings → General →
-Restart project** (~1 min downtime, releases everything, typically
-restores performance immediately). If sluggishness recurs after
-restart, the durable fix is a compute upgrade (paid; owner decision) —
-the project runs 8 cron jobs and hundreds of edge-function calls a day
-on the smallest tier.
+**Owner restarted the project at 23:24:26 UTC — this layer is FIXED.**
+Fresh postmaster, disk-IO budget released, delivery chain confirmed
+working end-to-end. In the following ~5 hours: 791 new photos imported,
+1,450 posts resolved, 918 new product matches. Infra incident closed.
+
+### 0b. 🚨 NEW blocker found post-restart: both AI providers out of budget — OPEN, discovered 2026-07-19 ~04:15 UTC
+The restart's catch-up burst (hundreds of photos needing AI tagging at
+once, after hours stalled) burned through whatever Gemini quota
+remained within ~80 minutes. **Both configured providers are now
+refusing every call:**
+- **Gemini** (`GEMINI_API_KEY`): `"Your project has exceeded its
+  monthly spending cap"` (Google AI Studio) — first hit ~00:46 UTC.
+- **Claude fallback** (`ANTHROPIC_API_KEY`): `"Your credit balance is
+  too low to access the Anthropic API"` (Anthropic Console) — confirmed
+  via a direct test call through the `awin_test` diagnostic function
+  (added a `claude_test` mode for this).
+
+**Impact — this is now the only thing actually blocking the pipeline**
+(all three infra layers above are fixed): `analyze_photo` returns 500
+on every photo (no AI provider available), so nothing new gets tagged
+or auto-published; `source_products` (the exact + cheaper-alternatives
+feature) can't source anything either, since it's Gemini-only. 415
+photos are stuck cycling `pending` → retry → `pending` forever until
+one provider has budget again. `resolve_articles` and `match_products`
+are unaffected (no AI calls) and continue working normally against
+existing data.
+
+**Owner action needed — pick one (either unblocks everything):**
+1. Raise/remove the Gemini monthly spend cap: https://ai.studio/spend
+2. Add credits in the Anthropic Console: https://console.anthropic.com/settings/billing
+
+No code or infra fix applies here — this is purely an account-billing
+gate on both providers simultaneously.
 
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
