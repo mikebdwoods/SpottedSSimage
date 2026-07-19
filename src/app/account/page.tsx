@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { UpdateProfileForm } from "@/components/account/update-profile-form";
+import { ChangePasswordForm } from "@/components/account/change-password-form";
 
 export const metadata: Metadata = {
   title: "My Account | Spotted",
@@ -52,6 +53,15 @@ export default async function AccountPage() {
             userId={user.id}
             initialDisplayName={profile?.display_name ?? ""}
           />
+        </section>
+
+        {/* Security */}
+        <section className="border rounded-xl p-6 mb-8">
+          <h2 className="text-lg font-semibold mb-1">Password</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Set or change the password used to sign in.
+          </p>
+          <ChangePasswordForm />
         </section>
 
         {/* Saved Looks */}

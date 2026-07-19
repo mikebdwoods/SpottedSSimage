@@ -92,6 +92,30 @@ Deno.serve(async (req) => {
       (globalThis as any).EdgeRuntime?.waitUntil(task);
       return json({ started: true });
     }
+    if (typeof body?.auth_test_email === "string" && typeof body?.auth_test_password === "string") {
+      const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabase = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      try {
+        const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: anonKey ?? "",
+          },
+          body: JSON.stringify({ email: body.auth_test_email, password: body.auth_test_password }),
+        });
+        const data = await res.json();
+        // Never log the password; only whether the sign-in itself succeeded.
+        const result = { status: res.status, ok: res.ok, has_access_token: !!data?.access_token, error: data?.error_description ?? data?.msg ?? null };
+        await supabase.from("debug_log").insert({ label: "auth_test", payload: result });
+        return json(result);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        await supabase.from("debug_log").insert({ label: "auth_test", payload: { error: msg } });
+        return json({ error: msg }, 500);
+      }
+    }
     if (body?.claude_test === true) {
       const key = Deno.env.get("ANTHROPIC_API_KEY");
       const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

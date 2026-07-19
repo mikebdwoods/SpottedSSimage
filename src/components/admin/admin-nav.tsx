@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/admin/merch", label: "Merch" },
   { href: "/admin/newsletter", label: "Newsletter" },
   { href: "/admin/comments", label: "Comments" },
+  { href: "/admin/users", label: "Users" },
 ];
 
 export function AdminNav() {

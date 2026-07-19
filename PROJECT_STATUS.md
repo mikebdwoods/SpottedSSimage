@@ -250,6 +250,55 @@ none of this needs Gemini/Anthropic budget:
 Free tier: 100 queries/day; $5/1,000 beyond that — no grounded-LLM
 guessing, real search results only.
 
+### 0i. Admin account + full login/password system wired — 2026-07-19
+`mike@bdwoods.co.uk` already existed as a confirmed user (created
+2025-10-28) but had no row in `user_roles`. Granted admin via a direct
+`user_roles` upsert and set a temporary password by writing a
+bcrypt hash straight into `auth.users.encrypted_password` with
+`extensions.crypt(pw, extensions.gen_salt('bf', 10))` (matches
+GoTrue's own hash format, confirmed against an existing user's hash
+prefix). Verified live — not assumed — by calling the real
+`/auth/v1/token?grant_type=password` endpoint via the `awin_test`
+diagnostic function (`auth_test_email`/`auth_test_password` mode,
+logs only `{status, ok, has_access_token}`, never the password) before
+trusting it; result was `has_access_token: true`. The other existing
+admin (`michael@bdwoods.co.uk`) and other users were left untouched.
+
+Built out the full password login flow, since until now the site only
+supported magic-link and Google OAuth:
+- `LoginForm` rewritten — password sign-in is now the default, with a
+  toggle back to magic-link (kept for existing users who rely on it),
+  plus a "Forgot password?" link. Google OAuth unchanged.
+- `/auth/forgot-password` + `ForgotPasswordForm` — calls
+  `resetPasswordForEmail`, redirects through the existing PKCE
+  `/auth/callback` route with `?next=/auth/reset-password`.
+- `/auth/reset-password` + `ResetPasswordForm` — verifies a recovery
+  session exists (established by the callback route) before showing
+  the new-password form; calls `updateUser({password})`.
+- `/account` — added a "Password" section (`ChangePasswordForm`) so any
+  logged-in user can set/change their password without re-entering the
+  old one.
+
+Also discovered a fully-built but never-wired admin RPC system
+(`admin_list_users`, `admin_set_role`, `admin_add_invite`,
+`admin_delete_invite`, `admin_list_invites`, `admin_deactivate_user`,
+`admin_reactivate_user`, backed by a `pending_user_invites` table +
+trigger that auto-applies a pending invite's role on signup) — built
+the missing UI for it at **`/admin/users`**: lists all accounts with
+join/last-sign-in dates, admin badge, and deactivated badge; toggle
+admin role per user (self-demotion blocked); deactivate/reactivate
+accounts (deactivate sets `banned_until` ~100 years out, blocking
+sign-in without deleting anything); invite-by-email form that
+pre-assigns a role (admin or user) for whenever that email first signs
+up, with a pending-invites list and remove button. Added "Users" to
+the admin nav. Typechecked and built clean (`tsc --noEmit`, `next
+build`, all 51 routes).
+
+**The temporary password for `mike@bdwoods.co.uk` was communicated to
+the user directly in chat (not stored in this file) — first action
+after logging in should be changing it via `/account` or the
+forgot-password flow.**
+
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
 20/batch (480/day) had become the pipeline's choke point — 954 photos
