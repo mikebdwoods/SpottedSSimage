@@ -233,7 +233,13 @@ function parseHtmlProduct(text: string): { title?: string; image?: string; price
     text.match(/<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i)?.[1] ??
     text.match(/itemprop=["']price["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i)?.[1] ??
     text.match(/"priceCurrency"\s*:\s*"GBP"\s*,\s*"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)/i)?.[1] ??
-    text.match(/"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)"?\s*,\s*"priceCurrency"\s*:\s*"GBP"/i)?.[1];
+    text.match(/"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)"?\s*,\s*"priceCurrency"\s*:\s*"GBP"/i)?.[1] ??
+    // Some Shopify themes (Missoma confirmed) embed their product JSON-LD
+    // as an escaped string inside an inline <script> hydration payload -
+    // literal backslash-quote (\") instead of a plain ", which the plain
+    // patterns above never match. Same key order as the standard case,
+    // just with each quote optionally backslash-escaped.
+    text.match(/\\?"price\\?"\s*:\s*\\?"([0-9]+(?:\.[0-9]{2})?)\\?"\s*,\s*\\?"priceCurrency\\?"\s*:\s*\\?"GBP\\?"/i)?.[1];
 
   const title = ld.title ?? (ogTitle ? decodeHtmlEntities(ogTitle.trim()) : undefined);
   return {
@@ -250,7 +256,12 @@ async function verifyCandidate(url: string): Promise<Verified | null> {
       headers: { "User-Agent": BROWSER_UA, Accept: "text/html,application/xhtml+xml" },
     });
     if (res.ok) {
-      const text = (await res.text()).slice(0, 500_000);
+      // Modern storefronts (Shopify hydration payloads especially) can
+      // easily exceed 1MB of HTML before the JSON-LD/price data even
+      // appears - 500KB was silently truncating price data out of pages
+      // that run past it (confirmed on Missoma, ~1.2MB pages). 3MB
+      // comfortably covers this without meaningful cost in the edge runtime.
+      const text = (await res.text()).slice(0, 3_000_000);
       const p = parseHtmlProduct(text);
       if (p.title && !looksGenericTitle(p.title) && p.image && p.image.startsWith("http") && !looksGenericImage(p.image)) {
         return { title: p.title, price: p.price ?? null, image: p.image, finalUrl: url };

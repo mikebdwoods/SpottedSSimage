@@ -424,6 +424,65 @@ don't need AI budget, new secrets, or a user decision:
   risk of leaving a dangling reference some future feature might not
   expect, so left as-is rather than force a low-value change.
 
+### 0l. Retailer-sitemap catalog ingestion — SHIPPED and RUNNING, zero AI/paid-API cost — 2026-07-19
+Built the "sitemap bulk-ingester" flagged since the very first sourcing
+pass as the non-AI path to catalog scale (see build-log issue 2's
+2026-07-18 night entry) — this is genuinely free, unlike everything
+else on the roadmap still waiting on API keys, so it's live now rather
+than parked.
+
+**New edge function `ingest_retailer_sitemap`**, walking the public XML
+sitemaps END., Missoma, and Uniqlo already publish for search-engine
+crawlers (discovered live via a new `raw_text`/`grep_url` diagnostic
+mode added to `awin_test`):
+- **END.** (`endclothing.com`): `gb_sitemap.xml` index → 5 shards,
+  ~48,000 product URLs each matching `/gb/{slug}.html` (confirmed via
+  live regex count on shard 1 alone) — mixed in with category/brand
+  pages in the same files, filtered by URL pattern.
+- **Missoma** (`missoma.com`): standard Shopify sitemap index →
+  `sitemap_products_1.xml`, ~1,349 product URLs matching `/products/*`.
+- **Uniqlo** (`uniqlo.com/uk`): `sitemap_gb-en.xml`, a flat file mixing
+  navigation/category pages with ~2,231 product URLs matching
+  `/en/products/{code}/{variant}`.
+
+Each product page is verified before insertion — JSON-LD `Product`
+schema first, og: tags as fallback, same extraction logic as
+`source_products` (kept in sync, both files own a self-contained copy
+per this project's one-file-per-function convention). Cursor state
+(`sitemap_ingest_state` table) caches the extracted product-URL list
+per sub-sitemap so a multi-MB sitemap file is fetched+regexed once, not
+every cron tick, and walks forward with each run; looping back to the
+start when exhausted is harmless since `products` has a `UNIQUE
+(title, product_url)` constraint.
+
+**Two real bugs found and fixed while verifying, both shared with
+`source_products` since they use the same parsing code:**
+- **500KB HTML truncation was silently eating price data.** Missoma's
+  pages run ~1.2MB; the price JSON-LD sat past the old
+  `.slice(0, 500_000)` cutoff, so every insert had a real title/image
+  but `price: null`. Diagnosed by adding a `price_debug` mode to
+  `awin_test` that ran the exact extraction logic against full,
+  untruncated page content and proved the regex was fine - the input
+  just never reached it. Raised the cutoff to 3MB in both functions;
+  confirmed live afterwards with real prices (£89, £335, £115, etc.)
+  populating correctly.
+- **`http://` og:image on several Shopify storefronts** (Missoma's
+  theme confirmed, but the same pattern was already present on 5 other
+  existing catalog rows from earlier sourcing - ANNI LU, London
+  Diamonds, Boho Betty, Olivia Divine, Astrid & Miyu - so this
+  predates this session). Now upgraded to `https://` on insertion;
+  bulk-fixed all 15 pre-existing affected rows in one `UPDATE`.
+
+**Scheduled and running**: three staggered crons, one per retailer,
+every 20 minutes, batch of 6 products each (~26/hour, ~630/day total
+across all three) - deliberately modest, matching what a normal search
+crawler would do against the same public sitemaps. Verified each
+retailer live before scheduling. Only ever writes to `products`; never
+touches `photos`/`clothing_items`/`item_matches`, so it can't affect
+anything publicly visible on its own and needed no pipeline-pause
+exception - the redesigned `source_products`/`match_products` will
+draw on this larger catalog once re-enabled (item 0g/0j).
+
 ### 1. ~~Unclog the AI-tagging bottleneck~~ — DONE (2026-07-18)
 With the resolver importing hundreds of photos/day, hourly AI tagging at
 20/batch (480/day) had become the pipeline's choke point — 954 photos

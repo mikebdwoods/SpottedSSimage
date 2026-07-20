@@ -158,6 +158,77 @@ Deno.serve(async (req) => {
       await supabase.from("debug_log").insert({ label: "fetch_urls", payload: { results } });
       return json({ results });
     }
+    if (typeof body?.price_debug === "string") {
+      const res = await fetch(body.price_debug, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      });
+      const text = await res.text();
+      const attempts: Record<string, unknown> = {};
+      attempts.p1 = text.match(/<meta[^>]+property=["']product:price:amount["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i)?.[1] ?? null;
+      attempts.p2 = text.match(/itemprop=["']price["'][^>]+content=["']([0-9]+(?:\.[0-9]{2})?)["']/i)?.[1] ?? null;
+      attempts.p3 = text.match(/"priceCurrency"\s*:\s*"GBP"\s*,\s*"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)/i)?.[1] ?? null;
+      attempts.p4 = text.match(/"price"\s*:\s*"?([0-9]+(?:\.[0-9]{2})?)"?\s*,\s*"priceCurrency"\s*:\s*"GBP"/i)?.[1] ?? null;
+      attempts.p5_escaped = text.match(/\\?"price\\?"\s*:\s*\\?"([0-9]+(?:\.[0-9]{2})?)\\?"\s*,\s*\\?"priceCurrency\\?"\s*:\s*\\?"GBP\\?"/i)?.[1] ?? null;
+
+      const ldScripts = Array.from(
+        text.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)
+      ).map((m) => m[1]);
+      const ldDebug: Array<Record<string, unknown>> = [];
+      for (const raw of ldScripts.slice(0, 5)) {
+        try {
+          const parsed = JSON.parse(raw.trim());
+          const nodes = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.["@graph"]) ? parsed["@graph"] : [parsed];
+          for (const node of nodes) {
+            const type = node?.["@type"];
+            const isProduct = type === "Product" || (Array.isArray(type) && type.includes("Product"));
+            ldDebug.push({ type, isProduct, offers: isProduct ? node?.offers : undefined, name: isProduct ? node?.name : undefined });
+          }
+        } catch (err) {
+          ldDebug.push({ parseError: err instanceof Error ? err.message : String(err), rawStart: raw.slice(0, 100) });
+        }
+      }
+
+      const rawSnippetIdx = text.indexOf("priceCurrency");
+      return json({
+        url: body.price_debug,
+        status: res.status,
+        length: text.length,
+        attempts,
+        ld_script_count: ldScripts.length,
+        ld_debug: ldDebug,
+        raw_snippet_at_first_priceCurrency: text.slice(Math.max(0, rawSnippetIdx - 60), rawSnippetIdx + 40),
+      });
+    }
+    if (typeof body?.raw_text === "string") {
+      const res = await fetch(body.raw_text, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          Accept: "text/plain,text/xml,application/xml,*/*",
+        },
+      });
+      const text = await res.text();
+      const maxLen = typeof body?.max_len === "number" ? body.max_len : 4000;
+      return json({ url: body.raw_text, status: res.status, length: text.length, body: text.slice(0, maxLen) });
+    }
+    if (typeof body?.grep_url === "string" && typeof body?.grep_pattern === "string") {
+      const res = await fetch(body.grep_url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          Accept: "text/plain,text/xml,application/xml,*/*",
+        },
+      });
+      const text = await res.text();
+      const re = new RegExp(body.grep_pattern, "gi");
+      const matches = Array.from(new Set(Array.from(text.matchAll(re)).map((m) => m[0])));
+      const limit = typeof body?.limit === "number" ? body.limit : 40;
+      return json({ url: body.grep_url, status: res.status, length: text.length, total_matches: matches.length, matches: matches.slice(0, limit) });
+    }
     if (typeof body?.fetch_url === "string") {
       const result = await fetchOne(body.fetch_url);
       const res = await fetch(body.fetch_url, {
